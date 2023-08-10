@@ -20,15 +20,17 @@ async function runValidationScenario(page: Page) {
 	await expect(playground.submission).toHaveText(
 		JSON.stringify(
 			{
-				intent: 'submit',
 				payload: {
 					singleChoice: 'y',
 					multipleChoice: 'c',
 				},
 				error: {},
-				value: {
-					singleChoice: 'y',
-					multipleChoice: ['c'],
+				state: {
+					validated: {
+						singleChoice: true,
+						multipleChoice: true,
+					},
+					list: {},
 				},
 			},
 			null,
@@ -43,15 +45,19 @@ async function runValidationScenario(page: Page) {
 	await expect(playground.submission).toHaveText(
 		JSON.stringify(
 			{
-				intent: 'submit',
 				payload: {
 					singleChoice: 'y',
 					multipleChoice: ['a', 'c'],
+					'multipleChoice[0]': 'a',
+					'multipleChoice[1]': 'c',
 				},
 				error: {},
-				value: {
-					singleChoice: 'y',
-					multipleChoice: ['a', 'c'],
+				state: {
+					validated: {
+						singleChoice: true,
+						multipleChoice: true,
+					},
+					list: {},
 				},
 			},
 			null,

@@ -1,5 +1,5 @@
-import { conform, useForm } from '@conform-to/react';
-import { parse } from '@conform-to/zod';
+import { FormState, conform, useForm } from '@conform-to/react/experimental';
+import { parse } from '@conform-to/zod/experimental';
 import { type LoaderArgs, type ActionArgs, json } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
 import { z } from 'zod';
@@ -22,15 +22,15 @@ export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
 	const submission = parse(formData, { schema });
 
-	return json(submission);
+	return json(submission.report());
 }
 
 export default function Example() {
 	const { noClientValidate } = useLoaderData<typeof loader>();
-	const lastSubmission = useActionData<typeof action>();
-	const [form, { singleChoice, multipleChoice }] = useForm({
+	const lastResult = useActionData<typeof action>();
+	const form = useForm({
 		id: 'collection',
-		lastSubmission,
+		lastResult,
 		shouldRevalidate: 'onInput',
 		onValidate: !noClientValidate
 			? ({ formData }) => parse(formData, { schema })
@@ -38,14 +38,14 @@ export default function Example() {
 	});
 
 	return (
-		<Form method="post" {...form.props}>
-			<Playground title="Collection" lastSubmission={lastSubmission}>
-				<Field label="Single choice" config={singleChoice}>
+		<Form method="post" {...conform.form(form)}>
+			<FormState formId={form.id} />
+			<Playground title="Collection" lastSubmission={lastResult}>
+				<Field label="Single choice" config={form.fields.singleChoice}>
 					{conform
-						.collection(singleChoice, {
+						.collection(form.fields.singleChoice, {
 							type: 'radio',
 							options: ['x', 'y', 'z'],
-							ariaAttributes: true,
 						})
 						.map((props) => (
 							<label key={props.value} className="inline-block">
@@ -54,12 +54,11 @@ export default function Example() {
 							</label>
 						))}
 				</Field>
-				<Field label="Multiple choice" config={multipleChoice}>
+				<Field label="Multiple choice" config={form.fields.multipleChoice}>
 					{conform
-						.collection(multipleChoice, {
+						.collection(form.fields.multipleChoice, {
 							type: 'checkbox',
 							options: ['a', 'b', 'c', 'd'],
-							ariaAttributes: true,
 						})
 						.map((props) => (
 							<label key={props.value} className="inline-block">

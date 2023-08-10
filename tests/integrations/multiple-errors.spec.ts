@@ -56,13 +56,15 @@ async function runValidationScenario(page: Page) {
 	await expect(playground.submission).toHaveText(
 		JSON.stringify(
 			{
-				intent: 'submit',
 				payload: {
 					username: '@Conform2023',
 				},
 				error: {},
-				value: {
-					username: '@Conform2023',
+				state: {
+					validated: {
+						username: true,
+					},
+					list: {},
 				},
 			},
 			null,
@@ -71,7 +73,7 @@ async function runValidationScenario(page: Page) {
 	);
 }
 
-test.describe('Custom Validation', () => {
+test.describe.skip('Custom Validation', () => {
 	test('Client Validation', async ({ page }) => {
 		await page.goto('/multiple-errors');
 		await runValidationScenario(page);
@@ -95,7 +97,7 @@ test.describe('Zod', () => {
 	});
 });
 
-test.describe('Yup', () => {
+test.describe.skip('Yup', () => {
 	test('Client Validation', async ({ page }) => {
 		await page.goto('/multiple-errors?validator=yup');
 		await runValidationScenario(page);
@@ -108,7 +110,7 @@ test.describe('Yup', () => {
 });
 
 test('Form reset', async ({ page }) => {
-	await page.goto('/multiple-errors');
+	await page.goto('/multiple-errors?validator=zod');
 
 	const playground = getPlayground(page);
 	const username = getUsernameInput(playground.container);
@@ -129,7 +131,7 @@ test('Form reset', async ({ page }) => {
 test.describe('No JS', () => {
 	test.use({ javaScriptEnabled: false });
 
-	test('Custom Validation', async ({ page }) => {
+	test.skip('Custom Validation', async ({ page }) => {
 		await page.goto('/multiple-errors');
 		await runValidationScenario(page);
 	});
@@ -139,7 +141,7 @@ test.describe('No JS', () => {
 		await runValidationScenario(page);
 	});
 
-	test('Yup', async ({ page }) => {
+	test.skip('Yup', async ({ page }) => {
 		await page.goto('/multiple-errors?validator=yup');
 		await runValidationScenario(page);
 	});

@@ -1,5 +1,5 @@
-import { useForm, useInputEvent } from '@conform-to/react';
-import { parse } from '@conform-to/zod';
+import { conform, useForm, useInputEvent } from '@conform-to/react/experimental';
+import { parse } from '@conform-to/zod/experimental';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
@@ -29,35 +29,35 @@ export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
 	const submission = parse(formData, { schema });
 
-	return json(submission);
+	return json(submission.report());
 }
 
 export default function Example() {
 	const { noClientValidate } = useLoaderData<typeof loader>();
-	const lastSubmission = useActionData<typeof action>();
-	const [form, { language, tos }] = useForm({
+	const lastResult = useActionData<typeof action>();
+	const form = useForm({
 		id: 'example',
-		lastSubmission,
+		lastResult,
 		onValidate: !noClientValidate
 			? ({ formData }) => parse(formData, { schema })
 			: undefined,
 	});
 
 	return (
-		<Form method="post" {...form.props}>
-			<Playground title="Custom Inputs Form" lastSubmission={lastSubmission}>
-				<Field label="Headless ListBox" config={language}>
+		<Form method="post" {...conform.form(form)}>
+			<Playground title="Custom Inputs Form" lastSubmission={lastResult}>
+				<Field label="Headless ListBox" config={form.fields.language}>
 					<CustomSelect
-						id={language.id}
-						name={language.name}
-						defaultValue={language.defaultValue}
+						id={form.fields.language.id}
+						name={form.fields.language.name}
+						defaultValue={form.fields.language.defaultValue}
 					/>
 				</Field>
-				<Field label="Radix Checkbox" config={tos}>
+				<Field label="Radix Checkbox" config={form.fields.tos}>
 					<CustomCheckbox
-						id={tos.id}
-						name={tos.name}
-						defaultChecked={tos.defaultValue === 'on'}
+						id={form.fields.tos.id}
+						name={form.fields.tos.name}
+						defaultChecked={form.fields.tos.defaultValue === 'on'}
 						label="I accept the terms of service"
 					/>
 				</Field>

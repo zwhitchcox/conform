@@ -5,6 +5,7 @@
 		"moduleResolution": "node16",
 		"allowSyntheticDefaultImports": false,
 		"noUncheckedIndexedAccess": true,
+		"jsx": "react-jsx",
 		"strict": true,
 		"declaration": true,
 		"emitDeclarationOnly": true,

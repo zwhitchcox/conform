@@ -14,6 +14,13 @@
 			"import": "./index.mjs",
 			"require": "./index.js",
 			"default": "./index.mjs"
+		},
+		"./experimental": {
+			"types": "./experimental/index.d.ts",
+			"module": "./experimental/index.mjs",
+			"import": "./experimental/index.mjs",
+			"require": "./experimental/index.js",
+			"default": "./experimental/index.mjs"
 		}
 	},
 	"repository": {

@@ -1,5 +1,6 @@
-import { conform, useFieldList, useForm, list } from '@conform-to/react';
-import { parse } from '@conform-to/zod';
+import { FormState, conform, useFieldList, useForm } from '@conform-to/react/experimental';
+import { list } from '@conform-to/react';
+import { parse } from '@conform-to/zod/experimental';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
@@ -28,14 +29,14 @@ export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
 	const submission = parse(formData, { schema });
 
-	return json(submission);
+	return json(submission.report());
 }
 
 export default function SimpleList() {
 	const { hasDefaultValue, noClientValidate } = useLoaderData<typeof loader>();
-	const lastSubmission = useActionData();
-	const [form, { items }] = useForm({
-		lastSubmission,
+	const lastResult = useActionData();
+	const form = useForm({
+		lastResult,
 		defaultValue: hasDefaultValue
 			? { items: ['default item 0', 'default item 1'] }
 			: undefined,
@@ -43,14 +44,17 @@ export default function SimpleList() {
 			? ({ formData }) => parse(formData, { schema })
 			: undefined,
 	});
-	const itemsList = useFieldList(form.ref, items);
+	const items = useFieldList(form.fields.items);
+
+	console.log({ items });
 
 	return (
-		<Form method="post" {...form.props}>
-			<Playground title="Simple list" lastSubmission={lastSubmission}>
+		<Form method="post" {...conform.form(form)}>
+			<FormState formId={form.id} />
+			<Playground title="Simple list" lastSubmission={lastResult}>
 				<Alert errors={items.errors} />
 				<ol>
-					{itemsList.map((item, index) => (
+					{items.list.map((item, index) => (
 						<li key={item.key} className="border rounded-md p-4 mb-4">
 							<Field label={`Item #${index + 1}`} config={item}>
 								<input {...conform.input(item, { type: 'text' })} />
@@ -84,13 +88,13 @@ export default function SimpleList() {
 				<div className="flex flex-row gap-2">
 					<button
 						className="rounded-md border p-2 hover:border-black"
-						{...list.prepend(items.name)}
+						{...list.prepend(items.name, { defaultValue: '' })}
 					>
 						Insert top
 					</button>
 					<button
 						className="rounded-md border p-2 hover:border-black"
-						{...list.append(items.name)}
+						{...list.append(items.name, { defaultValue: '' })}
 					>
 						Insert bottom
 					</button>

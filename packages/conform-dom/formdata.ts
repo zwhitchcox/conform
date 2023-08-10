@@ -70,11 +70,11 @@ export function formatPaths(paths: Array<string | number>): string {
 /**
  * Assign a value to a target object by following the paths on the name
  */
-export function setValue(
+export function setValue<Value>(
 	target: Record<string, any>,
 	name: string,
-	valueFn: (prev?: unknown) => any,
-): void {
+	valueFn: (prev?: unknown) => Value,
+): Value {
 	const paths = getPaths(name);
 	const length = paths.length;
 	const lastIndex = length - 1;
@@ -93,6 +93,9 @@ export function setValue(
 		pointer[key] = newValue;
 		pointer = pointer[key];
 	}
+
+	// @ts-expect-error: The pointer should be assigned with the result of the valueFn
+	return pointer;
 }
 
 /**

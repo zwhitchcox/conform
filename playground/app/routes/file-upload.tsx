@@ -1,5 +1,5 @@
-import { conform, useForm } from '@conform-to/react';
-import { parse } from '@conform-to/zod';
+import { conform, useForm } from '@conform-to/react/experimental';
+import { parse } from '@conform-to/zod/experimental';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
@@ -36,28 +36,28 @@ export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
 	const submission = parse(formData, { schema });
 
-	return json(submission);
+	return json(submission.report());
 }
 
 export default function FileUpload() {
 	const { noClientValidate } = useLoaderData<typeof loader>();
-	const lastSubmission = useActionData<typeof action>();
-	const [form, { file, files }] = useForm({
-		lastSubmission,
+	const lastResult = useActionData<typeof action>();
+	const form = useForm({
+		lastResult,
 		onValidate: !noClientValidate
 			? ({ formData }) => parse(formData, { schema })
 			: undefined,
 	});
 
 	return (
-		<Form method="post" {...form.props} encType="multipart/form-data">
-			<Playground title="Employee Form" lastSubmission={lastSubmission}>
+		<Form method="post" {...conform.form(form)} encType="multipart/form-data">
+			<Playground title="Employee Form" lastSubmission={lastResult}>
 				<Alert errors={form.errors} />
-				<Field label="Single file" config={file}>
-					<input {...conform.input(file, { type: 'file' })} />
+				<Field label="Single file" config={form.fields.file}>
+					<input {...conform.input(form.fields.file, { type: 'file' })} />
 				</Field>
-				<Field label="Multiple files" config={files}>
-					<input {...conform.input(files, { type: 'file' })} multiple />
+				<Field label="Multiple files" config={form.fields.files}>
+					<input {...conform.input(form.fields.files, { type: 'file' })} multiple />
 				</Field>
 			</Playground>
 		</Form>

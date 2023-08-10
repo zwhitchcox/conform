@@ -1,5 +1,6 @@
-import { conform, useForm, validate } from '@conform-to/react';
-import { parse } from '@conform-to/zod';
+import { validate } from '@conform-to/dom';
+import { conform, useForm } from '@conform-to/react/experimental';
+import { parse } from '@conform-to/zod/experimental';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
@@ -23,38 +24,38 @@ export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
 	const submission = parse(formData, { schema });
 
-	return json(submission);
+	return json(submission.report());
 }
 
 export default function Validate() {
 	const { noClientValidate } = useLoaderData<typeof loader>();
-	const lastSubmission = useActionData();
-	const [form, { name, message }] = useForm({
-		lastSubmission,
+	const lastResult = useActionData();
+	const form = useForm({
+		lastResult,
 		onValidate: !noClientValidate
 			? ({ formData }) => parse(formData, { schema })
 			: undefined,
 	});
 
 	return (
-		<Form method="post" {...form.props}>
-			<Playground title="Validate" lastSubmission={lastSubmission}>
-				<Field label="Name" config={name}>
-					<input {...conform.input(name, { type: 'text' })} />
+		<Form method="post" {...conform.form(form)}>
+			<Playground title="Validate" lastSubmission={lastResult}>
+				<Field label="Name" config={form.fields.name}>
+					<input {...conform.input(form.fields.name, { type: 'text' })} />
 				</Field>
-				<Field label="Message" config={message}>
-					<textarea {...conform.textarea(message)} />
+				<Field label="Message" config={form.fields.message}>
+					<textarea {...conform.textarea(form.fields.message)} />
 				</Field>
 				<div className="flex flex-row gap-2">
 					<button
 						className="rounded-md border p-2 hover:border-black"
-						{...validate(name.name)}
+						{...validate(form.fields.name.name)}
 					>
 						Validate Name
 					</button>
 					<button
 						className="rounded-md border p-2 hover:border-black"
-						{...validate(message.name)}
+						{...validate(form.fields.message.name)}
 					>
 						Validate Message
 					</button>

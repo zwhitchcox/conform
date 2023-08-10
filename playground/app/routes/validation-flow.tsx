@@ -1,5 +1,5 @@
-import { conform, useForm } from '@conform-to/react';
-import { parse } from '@conform-to/zod';
+import { FormState, conform, useForm } from '@conform-to/react/experimental';
+import { parse } from '@conform-to/zod/experimental';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
@@ -44,7 +44,7 @@ export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
 	const submission = parse(formData, { schema });
 
-	return json(submission);
+	return json(submission.report());
 }
 
 export default function ValidationFlow() {
@@ -54,9 +54,9 @@ export default function ValidationFlow() {
 		shouldRevalidate,
 		showInputWithNoName,
 	} = useLoaderData<typeof loader>();
-	const lastSubmission = useActionData();
-	const [form, { email, password, confirmPassword }] = useForm({
-		lastSubmission,
+	const lastResult = useActionData<typeof action>();
+	const form = useForm({
+		lastResult,
 		shouldValidate,
 		shouldRevalidate,
 		onValidate: !noClientValidate
@@ -65,16 +65,17 @@ export default function ValidationFlow() {
 	});
 
 	return (
-		<Form method="post" {...form.props}>
-			<Playground title="Validation Flow" lastSubmission={lastSubmission}>
-				<Field label="Email" config={email}>
-					<input {...conform.input(email, { type: 'email' })} />
+		<Form method="post" {...conform.form(form)}>
+			<FormState formId={form.id} />
+			<Playground title="Validation Flow" lastSubmission={lastResult}>
+				<Field label="Email" config={form.fields.email}>
+					<input {...conform.input(form.fields.email, { type: 'email' })} />
 				</Field>
-				<Field label="Password" config={password}>
-					<input {...conform.input(password, { type: 'password' })} />
+				<Field label="Password" config={form.fields.password}>
+					<input {...conform.input(form.fields.password, { type: 'password' })} />
 				</Field>
-				<Field label="Confirm password" config={confirmPassword}>
-					<input {...conform.input(confirmPassword, { type: 'password' })} />
+				<Field label="Confirm password" config={form.fields.confirmPassword}>
+					<input {...conform.input(form.fields.confirmPassword, { type: 'password' })} />
 				</Field>
 				{showInputWithNoName ? (
 					<Field label="Input with no name">

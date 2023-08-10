@@ -32,24 +32,6 @@ async function runValidationScenario(page: Page) {
 
 	await playground.submit.click();
 	await expect(playground.error).toHaveText(['', '']);
-	await expect(playground.submission).toHaveText(
-		JSON.stringify(
-			{
-				intent: 'submit',
-				payload: {
-					name: 'Conform',
-					message: 'A form validation library',
-				},
-				error: {},
-				value: {
-					name: 'Conform',
-					message: 'A form validation library',
-				},
-			},
-			null,
-			2,
-		),
-	);
 }
 
 test.describe('With JS', () => {

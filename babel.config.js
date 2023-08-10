@@ -9,7 +9,7 @@ module.exports = {
 				},
 			},
 		],
-		'@babel/preset-react',
+		['@babel/preset-react', { runetime: 'automatic' }],
 		'@babel/preset-typescript',
 	],
 	plugins: [],

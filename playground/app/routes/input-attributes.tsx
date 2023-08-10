@@ -1,7 +1,7 @@
-import { conform, useForm, parse } from '@conform-to/react';
+import { type SubmissionResult } from '@conform-to/dom/experimental';
+import { conform, useForm } from '@conform-to/react/experimental';
 import { json, type ActionArgs, type LoaderArgs } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
-import { useRef } from 'react';
 import { Playground, Field, Alert } from '~/components';
 
 interface Schema {
@@ -24,43 +24,51 @@ export async function loader({ request }: LoaderArgs) {
 
 export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
-	const submission = parse(formData, {
-		resolve({ languages }) {
-			if (!languages) {
-				return {
-					error: {
-						// Checkbox group cannot be validated with the required constraint
-						languages: ['Please select at least one language'],
-					},
-				};
+	const payload: Record<string, string | string[]> = {};
+	const error: Record<string, string[]> = {};
+	const validated: Record<string, boolean> = {};
+
+	for (const name of ['title', 'description', 'rating', 'images', 'tags', 'released', 'languages']) {
+		const values = formData.getAll(name);
+
+		validated[name] = true;
+		error[name] = ['invalid'];
+
+		for (const next of values) {
+			const prev = payload[name];
+
+			if (typeof next === 'string') {
+				if (typeof prev === 'undefined') {
+					payload[name] = next;
+				} else {
+					payload[name] = Array.isArray(prev)
+						? [...prev, next]
+						: [prev, next];
+				}
 			}
+		}
+	}
 
-			return {
-				value: {},
-			};
-		},
-	});
-
-	return json({
-		...submission,
+	return json<SubmissionResult>({
+		payload,
 		error: {
-			...submission.error,
-			'': ['Submitted'],
+			...error,
+			'': ['invalid'],
+			released: ['invalid']
+		},
+		state: {
+			validated,
+			list: {},
 		},
 	});
 }
 
 export default function Example() {
 	const { enableDescription } = useLoaderData<typeof loader>();
-	const lastSubmission = useActionData<typeof action>();
-	const ref = useRef<HTMLFormElement>(null);
-	const [
-		form,
-		{ title, description, images, rating, tags, released, languages },
-	] = useForm<Schema>({
+	const lastResult = useActionData<typeof action>();
+	const form = useForm<Schema>({
 		id: 'test',
-		ref,
-		lastSubmission,
+		lastResult,
 		constraint: {
 			title: {
 				required: true,
@@ -96,40 +104,36 @@ export default function Example() {
 		},
 	});
 
-	if (form.ref !== ref || form.props.ref !== ref) {
-		throw new Error('Invalid ref object');
-	}
-
 	return (
-		<Form method="post" encType="multipart/form-data" {...form.props}>
-			<Playground title="Input attributes" lastSubmission={lastSubmission}>
+		<Form method="post" encType="multipart/form-data" {...conform.form(form)}>
+			<Playground title="Input attributes" lastSubmission={lastResult}>
 				<Alert id={form.errorId} errors={form.errors} />
-				<Field label="Title" config={title}>
+				<Field label="Title" config={form.fields.title}>
 					<input
-						{...conform.input(title, {
+						{...conform.input(form.fields.title, {
 							type: 'text',
 							description: enableDescription,
 						})}
 					/>
 				</Field>
-				<Field label="Description" config={description}>
+				<Field label="Description" config={form.fields.description}>
 					<textarea
-						{...conform.textarea(description, {
+						{...conform.textarea(form.fields.description, {
 							description: enableDescription,
 						})}
 					/>
 				</Field>
-				<Field label="Image" config={images}>
+				<Field label="Image" config={form.fields.images}>
 					<input
-						{...conform.input(images, {
+						{...conform.input(form.fields.images, {
 							type: 'file',
 							description: enableDescription,
 						})}
 					/>
 				</Field>
-				<Field label="Tags" config={tags}>
+				<Field label="Tags" config={form.fields.tags}>
 					<select
-						{...conform.select(tags, {
+						{...conform.select(form.fields.tags, {
 							description: enableDescription,
 						})}
 					>
@@ -143,17 +147,17 @@ export default function Example() {
 						<option value="romance">Romance</option>
 					</select>
 				</Field>
-				<Field label="Rating" config={rating}>
+				<Field label="Rating" config={form.fields.rating}>
 					<input
-						{...conform.input(rating, {
+						{...conform.input(form.fields.rating, {
 							type: 'number',
 							description: enableDescription,
 						})}
 					/>
 				</Field>
-				<Field label="Released" config={released}>
+				<Field label="Released" config={form.fields.released}>
 					{conform
-						.collection(released, {
+						.collection(form.fields.released, {
 							type: 'radio',
 							options: ['yes', 'no'],
 							ariaAttributes: true,
@@ -170,9 +174,9 @@ export default function Example() {
 							</label>
 						))}
 				</Field>
-				<Field label="Languages" config={languages}>
+				<Field label="Languages" config={form.fields.languages}>
 					{conform
-						.collection(languages, {
+						.collection(form.fields.languages, {
 							type: 'checkbox',
 							options: ['en', 'de', 'jp'],
 							ariaAttributes: true,

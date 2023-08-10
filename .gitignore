@@ -15,12 +15,12 @@ pids
 *.pid.lock
 
 # Build result
-/packages/*/*.js
-/packages/*/*.cjs
-/packages/*/*.mjs
-/packages/*/*.d.ts
-/packages/*/LICENSE
-/packages/*/_virtual
+/packages/**/*.js
+/packages/**/*.cjs
+/packages/**/*.mjs
+/packages/**/*.d.ts
+/packages/**/LICENSE
+/packages/**/_virtual
 
 # Anything built
 build/

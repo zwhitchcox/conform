@@ -1,11 +1,11 @@
-import { conform, parse, useForm } from '@conform-to/react';
-import { parse as parseWithZod } from '@conform-to/zod';
-import { parse as parseWithYup } from '@conform-to/yup';
+import { conform, useForm } from '@conform-to/react/experimental';
+import { parse as parseWithZod } from '@conform-to/zod/experimental';
+// import { parse as parseWithYup } from '@conform-to/yup';
 import { type LoaderArgs, type ActionArgs, json } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
 import { Playground, Field } from '~/components';
 import { z } from 'zod';
-import * as yup from 'yup';
+// import * as yup from 'yup';
 
 interface Schema {
 	username: string;
@@ -13,35 +13,35 @@ interface Schema {
 
 function parseForm(formData: FormData, validator: string | null) {
 	switch (validator) {
-		case 'yup': {
-			return parseWithYup(formData, {
-				schema: yup.object({
-					username: yup
-						.string()
-						.required('Username is required')
-						.test(
-							'test-minlength',
-							'Min. 5 characters',
-							(username) => !username || username.length > 5,
-						)
-						.test(
-							'test-lowercase',
-							'At least 1 lowercase character',
-							(username) => !username || username.toUpperCase() !== username,
-						)
-						.test(
-							'test-uppercase',
-							'At least 1 uppercase character',
-							(username) => !username || username.toLowerCase() !== username,
-						)
-						.test(
-							'test-number',
-							'At least 1 number',
-							(username) => !username || username.match(/[0-9]/) !== null,
-						),
-				}),
-			});
-		}
+		// case 'yup': {
+		// 	return parseWithYup(formData, {
+		// 		schema: yup.object({
+		// 			username: yup
+		// 				.string()
+		// 				.required('Username is required')
+		// 				.test(
+		// 					'test-minlength',
+		// 					'Min. 5 characters',
+		// 					(username) => !username || username.length > 5,
+		// 				)
+		// 				.test(
+		// 					'test-lowercase',
+		// 					'At least 1 lowercase character',
+		// 					(username) => !username || username.toUpperCase() !== username,
+		// 				)
+		// 				.test(
+		// 					'test-uppercase',
+		// 					'At least 1 uppercase character',
+		// 					(username) => !username || username.toLowerCase() !== username,
+		// 				)
+		// 				.test(
+		// 					'test-number',
+		// 					'At least 1 number',
+		// 					(username) => !username || username.match(/[0-9]/) !== null,
+		// 				),
+		// 		}),
+		// 	});
+		// }
 		case 'zod': {
 			return parseWithZod(formData, {
 				schema: z.object({
@@ -60,48 +60,50 @@ function parseForm(formData: FormData, validator: string | null) {
 				}),
 			});
 		}
-		default: {
-			return parse(formData, {
-				resolve({ username }) {
-					const errors: string[] = [];
+		// default: {
+		// 	return parse(formData, {
+		// 		resolve({ username }) {
+		// 			const errors: string[] = [];
 
-					if (typeof username !== 'string' || username === '') {
-						errors.push('Username is required');
-					} else {
-						if (username.length < 5) {
-							errors.push('Min. 5 characters');
-						}
+		// 			if (typeof username !== 'string' || username === '') {
+		// 				errors.push('Username is required');
+		// 			} else {
+		// 				if (username.length < 5) {
+		// 					errors.push('Min. 5 characters');
+		// 				}
 
-						if (username.toUpperCase() === username) {
-							errors.push('At least 1 lowercase character');
-						}
+		// 				if (username.toUpperCase() === username) {
+		// 					errors.push('At least 1 lowercase character');
+		// 				}
 
-						if (username.toLowerCase() === username) {
-							errors.push('At least 1 uppercase character');
-						}
+		// 				if (username.toLowerCase() === username) {
+		// 					errors.push('At least 1 uppercase character');
+		// 				}
 
-						if (!username.match(/[0-9]/)) {
-							errors.push('At least 1 number');
-						}
-					}
+		// 				if (!username.match(/[0-9]/)) {
+		// 					errors.push('At least 1 number');
+		// 				}
+		// 			}
 
-					if (errors.length > 0) {
-						return {
-							error: {
-								username: errors,
-							},
-						};
-					}
+		// 			if (errors.length > 0) {
+		// 				return {
+		// 					error: {
+		// 						username: errors,
+		// 					},
+		// 				};
+		// 			}
 
-					return {
-						value: {
-							username,
-						},
-					};
-				},
-			});
-		}
+		// 			return {
+		// 				value: {
+		// 					username,
+		// 				},
+		// 			};
+		// 		},
+		// 	});
+		// }
 	}
+
+	throw new Error('Only zod is supported at the moment');
 }
 
 export async function loader({ request }: LoaderArgs) {
@@ -118,24 +120,24 @@ export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
 	const submission = parseForm(formData, url.searchParams.get('validator'));
 
-	return json(submission);
+	return json(submission.report());
 }
 
 export default function Example() {
 	const { validator, noClientValidate } = useLoaderData<typeof loader>();
-	const lastSubmission = useActionData<typeof action>();
-	const [form, { username }] = useForm<Schema>({
-		lastSubmission,
+	const lastResult = useActionData<typeof action>();
+	const form = useForm<Schema>({
+		lastResult,
 		onValidate: !noClientValidate
 			? ({ formData }) => parseForm(formData, validator)
 			: undefined,
 	});
 
 	return (
-		<Form method="post" {...form.props}>
-			<Playground title="Mutliple Errors" lastSubmission={lastSubmission}>
-				<Field label="Username" config={username}>
-					<input {...conform.input(username, { type: 'text' })} />
+		<Form method="post" {...conform.form(form)}>
+			<Playground title="Mutliple Errors" lastSubmission={lastResult}>
+				<Field label="Username" config={form.fields.username}>
+					<input {...conform.input(form.fields.username, { type: 'text' })} />
 				</Field>
 			</Playground>
 		</Form>

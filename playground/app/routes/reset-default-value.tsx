@@ -1,5 +1,5 @@
-import { useForm, conform } from '@conform-to/react';
-import { parse } from '@conform-to/zod';
+import { useForm, conform } from '@conform-to/react/experimental';
+import { parse } from '@conform-to/zod/experimental';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { Form, Link, useActionData, useLoaderData } from '@remix-run/react';
@@ -51,32 +51,33 @@ export async function action({ request }: ActionArgs) {
 		schema,
 	});
 
-	if (!submission.value || submission.intent !== 'submit') {
-		return json(submission);
+	if (submission.state !== 'accepted') {
+		return json(submission.report());
 	}
 
 	// We can also skip sending the submission back to the client on success
 	// As the form value shuold be reset anyway
-	return json({
-		...submission,
-		payload: null,
-	});
+	return json(
+		submission.report({
+			resetForm: true,
+		}),
+	);
 }
 
 export default function ExampleForm() {
 	const { color, defaultValue } = useLoaderData<typeof loader>();
-	const lastSubmission = useActionData<typeof action>();
-	const [form, fieldset] = useForm({
+	const lastResult = useActionData<typeof action>();
+	const form = useForm({
+		lastResult,
 		defaultValue,
-		lastSubmission,
 	});
 
 	useEffect(() => {
-		form.ref.current?.reset();
-	}, [form.ref, color]);
+		document.forms.namedItem(form.id)?.reset();
+	}, [form.id, color]);
 
 	return (
-		<Form method="post" {...form.props}>
+		<Form method="post" {...conform.form(form)}>
 			<Playground
 				title="Payment Form"
 				description={
@@ -101,13 +102,13 @@ export default function ExampleForm() {
 						</ul>
 					</div>
 				}
-				lastSubmission={lastSubmission}
+				lastSubmission={lastResult}
 			>
-				<Field label="Name" config={fieldset.name}>
-					<input {...conform.input(fieldset.name, { type: 'text' })} />
+				<Field label="Name" config={form.fields.name}>
+					<input {...conform.input(form.fields.name, { type: 'text' })} />
 				</Field>
-				<Field label="Code" config={fieldset.code}>
-					<input {...conform.input(fieldset.code, { type: 'color' })} />
+				<Field label="Code" config={form.fields.code}>
+					<input {...conform.input(form.fields.code, { type: 'color' })} />
 				</Field>
 			</Playground>
 		</Form>

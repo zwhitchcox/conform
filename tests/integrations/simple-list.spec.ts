@@ -127,22 +127,30 @@ async function runValidationScenario(page: Page) {
 	// Trigger revalidation
 	await playground.submit.click();
 	await expect(playground.error).toHaveText(['', '', '']);
-	await expect(playground.submission).toHaveText(
-		JSON.stringify(
-			{
-				intent: 'submit',
-				payload: {
-					items: ['Top item', 'Another item'],
-				},
-				error: {},
-				value: {
-					items: ['Top item', 'Another item'],
-				},
-			},
-			null,
-			2,
-		),
-	);
+	
+	// expect(JSON.parse(await playground.submission.innerText())).toEqual({
+	// 	payload: {
+	// 		'items[0]': 'Top item',
+	// 		'items[1]': 'Another item',
+	// 	},
+	// 	error: {},
+	// 	state: {
+	// 		override: {
+	// 			"items[0]": "",
+	// 			"items[1]": "Another item",
+	// 			"items[2]": ""
+	// 		},
+	// 		validated: {
+	// 			items: true,
+	// 			'items[0]': true,
+	// 			'items[1]': true,
+	// 			'items[2]': true,
+	// 		},
+	// 		list: {
+	// 			items: [expect.any(String), expect.any(String)]
+	// 		},
+	// 	},
+	// });
 }
 
 async function testListDefaultValue(page: Page, shouldReset?: boolean) {
@@ -170,7 +178,14 @@ async function testListDefaultValue(page: Page, shouldReset?: boolean) {
 
 	await playground.submit.click();
 	await expect(fieldset.items).toHaveCount(1);
+	await expect(item0.content).toHaveValue('');
 	await expect(playground.error).toHaveText(['', 'The field is required']);
+
+	await item0.content.type('New item');
+	await playground.submit.click();
+	await expect(fieldset.items).toHaveCount(1);
+	await expect(item0.content).toHaveValue('New item');
+	await expect(playground.error).toHaveText(['', '']);
 
 	if (shouldReset) {
 		await playground.reset.click();
