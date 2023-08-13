@@ -1,4 +1,4 @@
-import { setValue } from "..";
+import { setValue } from './formdata.js';
 
 export function invariant(
 	expectedCondition: boolean,
@@ -23,7 +23,11 @@ export function flatten(
 				processArray(value, name);
 			} else if (value instanceof File) {
 				continue;
-			} else if (!(value instanceof Date) && typeof value === 'object' && value !== null) {
+			} else if (
+				!(value instanceof Date) &&
+				typeof value === 'object' &&
+				value !== null
+			) {
 				processObject(value, name);
 			} else {
 				result[name] = value;
@@ -33,7 +37,7 @@ export function flatten(
 
 	function processArray(array: any[], prefix: string): void {
 		// This creates an additional entry in case of checkbox group
-		if (array.every(item => typeof item === 'string')) {
+		if (array.every((item) => typeof item === 'string')) {
 			result[prefix] = array as string[];
 		}
 
@@ -45,7 +49,11 @@ export function flatten(
 				processArray(item, name);
 			} else if (item instanceof File) {
 				continue;
-			} else if (!(item instanceof Date) && typeof item === 'object' && item !== null) {
+			} else if (
+				!(item instanceof Date) &&
+				typeof item === 'object' &&
+				item !== null
+			) {
 				processObject(item, name);
 			} else {
 				result[name] = item;

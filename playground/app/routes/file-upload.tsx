@@ -1,5 +1,5 @@
-import { conform, useForm } from '@conform-to/react/experimental';
-import { parse } from '@conform-to/zod/experimental';
+import { conform, useForm } from '@conform-to/react';
+import { parse } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
@@ -57,7 +57,10 @@ export default function FileUpload() {
 					<input {...conform.input(form.fields.file, { type: 'file' })} />
 				</Field>
 				<Field label="Multiple files" config={form.fields.files}>
-					<input {...conform.input(form.fields.files, { type: 'file' })} multiple />
+					<input
+						{...conform.input(form.fields.files, { type: 'file' })}
+						multiple
+					/>
 				</Field>
 			</Playground>
 		</Form>

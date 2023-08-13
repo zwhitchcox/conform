@@ -1,14 +1,7 @@
-export type FormControl =
-	| HTMLInputElement
-	| HTMLSelectElement
-	| HTMLTextAreaElement
-	| HTMLButtonElement;
-
-export type Submitter = HTMLInputElement | HTMLButtonElement;
+import type { FormControl, FieldElement, Submitter } from './types.js';
 
 /**
- * A type guard to check if the provided reference is a form control element, including
- * `input`, `select`, `textarea` or `button`
+ * A type guard to check if the provided element is a form control
  */
 export function isFormControl(element: unknown): element is FormControl {
 	return (
@@ -21,13 +14,15 @@ export function isFormControl(element: unknown): element is FormControl {
 }
 
 /**
- * A type guard to check if the provided reference is a focusable form control element.
+ * A type guard to check if the provided element is a field element, which
+ * is a form control excluding submit, button and reset type.
  */
-export function isFocusableFormControl(
-	element: unknown,
-): element is FormControl {
+export function isFieldElement(element: unknown): element is FieldElement {
 	return (
-		isFormControl(element) && element.willValidate && element.type !== 'submit'
+		isFormControl(element) &&
+		element.type !== 'submit' &&
+		element.type !== 'button' &&
+		element.type !== 'reset'
 	);
 }
 
@@ -85,29 +80,6 @@ export function getFormMethod(
 }
 
 /**
- * Resolve the form element
- */
-export function getFormElement(
-	element:
-		| HTMLFormElement
-		| HTMLFieldSetElement
-		| HTMLInputElement
-		| HTMLSelectElement
-		| HTMLTextAreaElement
-		| HTMLButtonElement
-		| null,
-): HTMLFormElement | null {
-	return element instanceof HTMLFormElement ? element : element?.form ?? null;
-}
-
-/**
- * Returns a list of form control elements in the form
- */
-export function getFormControls(form: HTMLFormElement): FormControl[] {
-	return Array.from(form.elements).filter(isFormControl);
-}
-
-/**
  * A function to create a submitter button element
  */
 export function createSubmitter(config: {
@@ -118,7 +90,7 @@ export function createSubmitter(config: {
 	formEnctype?: ReturnType<typeof getFormEncType>;
 	formMethod?: ReturnType<typeof getFormMethod>;
 	formNoValidate?: boolean;
-}): HTMLButtonElement {
+}): Submitter {
 	const button = document.createElement('button');
 
 	button.name = config.name;
@@ -181,9 +153,9 @@ export function requestSubmit(
 /**
  * Focus on the first invalid form control in the form
  */
-export function focusFirstInvalidControl(form: HTMLFormElement) {
+export function focusFirstInvalidField(form: HTMLFormElement) {
 	for (const element of form.elements) {
-		if (isFocusableFormControl(element) && !element.validity.valid) {
+		if (isFieldElement(element) && !element.validity.valid) {
 			element.focus();
 			break;
 		}

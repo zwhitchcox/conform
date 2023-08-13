@@ -1,14 +1,9 @@
-import {
-	INTENT,
-	VALIDATION_UNDEFINED,
-	VALIDATION_SKIPPED,
-} from '@conform-to/dom';
-import type { FieldConfig, Primitive } from './hooks.js';
+import type { Form, Fieldset, FieldList, Field } from './hooks.js';
 import type { CSSProperties, HTMLInputTypeAttribute } from 'react';
 
 interface FormElementProps {
 	id?: string;
-	name: string;
+	name?: string;
 	form?: string;
 	'aria-describedby'?: string;
 	'aria-invalid'?: boolean;
@@ -22,13 +17,13 @@ interface FormControlProps extends FormElementProps {
 	'aria-hidden'?: boolean;
 }
 
-interface InputProps<Schema> extends FormControlProps {
+interface InputProps extends FormControlProps {
 	type?: HTMLInputTypeAttribute;
 	minLength?: number;
 	maxLength?: number;
-	min?: Schema extends number ? number : string | number;
-	max?: Schema extends number ? number : string | number;
-	step?: Schema extends number ? number : string | number;
+	min?: string | number;
+	max?: string | number;
+	step?: string | number;
 	pattern?: string;
 	multiple?: boolean;
 	value?: string;
@@ -47,6 +42,8 @@ interface TextareaProps extends FormControlProps {
 	defaultValue?: string;
 }
 
+type Primitive = string | number | boolean | Date | null | undefined;
+
 type BaseOptions =
 	| {
 			ariaAttributes?: true;
@@ -58,6 +55,13 @@ type BaseOptions =
 
 type ControlOptions = BaseOptions & {
 	hidden?: boolean;
+};
+
+type FormOptions<Type> = BaseOptions & {
+	onSubmit: (
+		event: React.FormEvent<HTMLFormElement>,
+		context: ReturnType<Form<Type>['onSubmit']>,
+	) => void;
 };
 
 type InputOptions = ControlOptions &
@@ -86,23 +90,25 @@ function cleanup<Props>(props: Props): Props {
 	return props;
 }
 
-function getFormElementProps(
-	config: FieldConfig<unknown>,
-	options: BaseOptions = {},
-): FormElementProps {
+function getAriaAttributes<
+	Config extends {
+		id: string;
+		errorId: string;
+		descriptionId: string;
+		errors: string[];
+	},
+>(config: Config, options: BaseOptions = {}) {
 	const hasAriaAttributes = options.ariaAttributes ?? true;
 
 	return cleanup({
-		id: config.id,
-		name: config.name,
-		form: config.form,
 		'aria-invalid':
-			hasAriaAttributes && config.errorId && config.error?.length
-				? true
-				: undefined,
+			(hasAriaAttributes && config.errorId && config.errors.length > 0) ||
+			undefined,
 		'aria-describedby': hasAriaAttributes
 			? [
-					config.errorId && config.error?.length ? config.errorId : undefined,
+					config.errorId && config.errors.length > 0
+						? config.errorId
+						: undefined,
 					config.descriptionId &&
 					options.ariaAttributes !== false &&
 					options.description
@@ -123,17 +129,33 @@ function getFormElementProps(
 	});
 }
 
+function getFormElementProps<
+	Config extends {
+		id: string;
+		name?: string;
+		formId: string;
+		errorId: string;
+		descriptionId: string;
+		errors: string[];
+	},
+>(config: Config, options: BaseOptions = {}): FormElementProps {
+	return cleanup({
+		id: config.id,
+		name: config.name,
+		form: config.formId,
+		...getAriaAttributes(config, options),
+	});
+}
+
 function getFormControlProps(
-	config: FieldConfig<unknown>,
+	field: Field<unknown>,
 	options?: ControlOptions,
 ): FormControlProps {
 	return cleanup({
-		...getFormElementProps(config, options),
-		required: config.required,
-		autoFocus:
-			config.initialError && Object.entries(config.initialError).length > 0
-				? true
-				: undefined,
+		...getFormElementProps(field, options),
+		required: field.constraint.required,
+		// FIXME: something to differentiate if the form is reloaded
+		autoFocus: false,
 		...(options?.hidden ? hiddenProps : undefined),
 	});
 }
@@ -163,34 +185,37 @@ export const hiddenProps: {
 };
 
 export function input<Schema extends Primitive | unknown>(
-	config: FieldConfig<Schema>,
+	field: Field<Schema>,
 	options?: InputOptions,
-): InputProps<Schema>;
+): InputProps;
 export function input<Schema extends File | File[]>(
-	config: FieldConfig<Schema>,
+	field: Field<Schema>,
 	options: InputOptions & { type: 'file' },
-): InputProps<Schema>;
+): InputProps;
 export function input<Schema extends Primitive | File | File[] | unknown>(
-	config: FieldConfig<Schema>,
+	field: Field<Schema>,
 	options: InputOptions = {},
-): InputProps<Schema> {
-	const props: InputProps<Schema> = {
-		...getFormControlProps(config, options),
+): InputProps {
+	const props: InputProps = {
+		...getFormControlProps(field, options),
 		type: options.type,
-		minLength: config.minLength,
-		maxLength: config.maxLength,
-		min: config.min,
-		max: config.max,
-		step: config.step,
-		pattern: config.pattern,
-		multiple: config.multiple,
+		minLength: field.constraint.minLength,
+		maxLength: field.constraint.maxLength,
+		min: field.constraint.min,
+		max: field.constraint.max,
+		step: field.constraint.step,
+		pattern: field.constraint.pattern,
+		multiple: field.constraint.multiple,
 	};
 
 	if (options.type === 'checkbox' || options.type === 'radio') {
 		props.value = options.value ?? 'on';
-		props.defaultChecked = config.defaultValue === props.value;
+		props.defaultChecked =
+			typeof field.defaultValue === 'boolean'
+				? field.defaultValue
+				: field.defaultValue === props.value;
 	} else if (options.type !== 'file') {
-		props.defaultValue = config.defaultValue as string | undefined;
+		props.defaultValue = `${field.defaultValue ?? ''}`;
 	}
 
 	return cleanup(props);
@@ -198,30 +223,55 @@ export function input<Schema extends Primitive | File | File[] | unknown>(
 
 export function select<
 	Schema extends Primitive | Primitive[] | undefined | unknown,
->(config: FieldConfig<Schema>, options?: ControlOptions): SelectProps {
+>(field: Field<Schema>, options?: ControlOptions): SelectProps {
 	return cleanup({
-		...getFormControlProps(config, options),
-		defaultValue: config.defaultValue,
-		multiple: config.multiple,
+		...getFormControlProps(field, options),
+		defaultValue: Array.isArray(field.defaultValue)
+			? field.defaultValue
+			: `${field.defaultValue ?? ''}`,
+		multiple: field.constraint.multiple,
 	});
 }
 
 export function textarea<Schema extends Primitive | undefined | unknown>(
-	config: FieldConfig<Schema>,
+	field: Field<Schema>,
 	options?: ControlOptions,
 ): TextareaProps {
 	return cleanup({
-		...getFormControlProps(config, options),
-		defaultValue: config.defaultValue,
-		minLength: config.minLength,
-		maxLength: config.maxLength,
+		...getFormControlProps(field, options),
+		defaultValue: `${field.defaultValue ?? ''}`,
+		minLength: field.constraint.minLength,
+		maxLength: field.constraint.maxLength,
+	});
+}
+
+export function form<
+	Schema extends Record<string, unknown> | undefined | unknown,
+>(form: Form<Schema>, options?: FormOptions<Schema>) {
+	return cleanup({
+		id: form.id,
+		onSubmit:
+			typeof options?.onSubmit !== 'function'
+				? form.onSubmit
+				: (event: React.FormEvent<HTMLFormElement>) => {
+						const context = form.onSubmit(event);
+
+						if (!event.defaultPrevented) {
+							options.onSubmit(event, context);
+						}
+				  },
+		noValidate: form.noValidate,
+		...getAriaAttributes(form, options),
 	});
 }
 
 export function fieldset<
 	Schema extends Record<string, unknown> | undefined | unknown,
->(config: FieldConfig<Schema>, options?: BaseOptions): FormControlProps {
-	return getFormElementProps(config, options);
+>(
+	field: Fieldset<Schema> | FieldList<Schema>,
+	options?: BaseOptions,
+): FormControlProps {
+	return getFormElementProps(field, options);
 }
 
 export function collection<
@@ -232,31 +282,28 @@ export function collection<
 		| undefined
 		| unknown,
 >(
-	config: FieldConfig<Schema>,
+	field: Field<Schema>,
 	options: BaseOptions & {
 		type: 'checkbox' | 'radio';
 		options: string[];
 	},
-): Array<
-	InputProps<Schema> & Pick<Required<InputProps<Schema>>, 'type' | 'value'>
-> {
+): Array<InputProps & Pick<Required<InputProps>, 'type' | 'value'>> {
 	return options.options.map((value) =>
 		cleanup({
-			...getFormControlProps(config, options),
-			id: config.id ? `${config.id}-${value}` : undefined,
+			...getFormControlProps(field, options),
+			id: field.id ? `${field.id}-${value}` : undefined,
 			type: options.type,
 			value,
 			defaultChecked:
-				options.type === 'checkbox' && Array.isArray(config.defaultValue)
-					? config.defaultValue.includes(value)
-					: config.defaultValue === value,
+				options.type === 'checkbox' && Array.isArray(field.defaultValue)
+					? field.defaultValue.includes(value)
+					: field.defaultValue === value,
 
 			// The required attribute doesn't make sense for checkbox group
 			// As it would require all checkboxes to be checked instead of at least one
-			// overriden with `undefiend` so it gets cleaned up
-			required: options.type === 'checkbox' ? undefined : config.required,
+			// It is overriden with `undefiend` so it could be cleaned upW properly
+			required:
+				options.type === 'checkbox' ? undefined : field.constraint.required,
 		}),
 	);
 }
-
-export { INTENT, VALIDATION_UNDEFINED, VALIDATION_SKIPPED };

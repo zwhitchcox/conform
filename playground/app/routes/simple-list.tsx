@@ -1,6 +1,11 @@
-import { FormState, conform, useFieldList, useForm } from '@conform-to/react/experimental';
-import { list } from '@conform-to/react';
-import { parse } from '@conform-to/zod/experimental';
+import {
+	FormState,
+	conform,
+	useFieldList,
+	useForm,
+	list,
+} from '@conform-to/react';
+import { parse } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
@@ -45,8 +50,6 @@ export default function SimpleList() {
 			: undefined,
 	});
 	const items = useFieldList(form.fields.items);
-
-	console.log({ items });
 
 	return (
 		<Form method="post" {...conform.form(form)}>

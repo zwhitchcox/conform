@@ -1,77 +1,24 @@
-import { getFormData } from '../formdata.js';
+import { getFormData } from './formdata.js';
 import {
-	type FormControl as FieldElement,
-	isFormControl as isFieldElement,
+	isFieldElement,
 	getFormAction,
 	getFormEncType,
 	getFormMethod,
-	focusFirstInvalidControl,
-} from '../dom.js';
-import { VALIDATION_SKIPPED } from '../parse.js';
-import { type Submission, type SubmissionResult } from './parse.js';
+	focusFirstInvalidField,
+} from './dom.js';
+import type {
+	Form,
+	FormAttributes,
+	FieldElement,
+	Submission,
+	SubmissionContext,
+	SubmissionResult,
+	Update,
+} from './types.js';
 import { invariant } from './util.js';
-
-export type Form = {
-	attributes: FormAttributes;
-	initialValue: Record<string, unknown>;
-	error: Record<string, string[]>;
-	state: FormState;
-	subscribers: Array<{
-		shouldNotify: (update: Update) => boolean;
-		callback: () => void;
-	}>;
-};
-
-export type Constraint = {
-	required?: boolean;
-	minLength?: number;
-	maxLength?: number;
-	min?: string | number;
-	max?: string | number;
-	step?: string | number;
-	multiple?: boolean;
-	pattern?: string;
-};
-
-export type FormAttributes = {
-	defaultValue: Record<string, unknown>;
-	constraint: Record<string, Constraint>;
-};
-
-export type FormState = {
-	validated: Record<string, boolean>;
-	list: Record<string, Array<string>>;
-};
-
-export type SubmissionContext = {
-	form: HTMLFormElement;
-	submitter: HTMLInputElement | HTMLButtonElement | null;
-	formData: FormData;
-};
 
 export type Registry = ReturnType<typeof createRegistry>;
 
-type Update =
-	| {
-			type: 'error';
-			name: string;
-			prev?: string[];
-			next: string[];
-	  }
-	| {
-			type: 'list';
-			name: string;
-			prev?: Array<string>;
-			next: Array<string>;
-	  }
-	| {
-			type: 'validated';
-			name: string;
-			prev?: boolean;
-			next: boolean;
-	  };
-
-// FIXME: this is probably not working as expected
 function shouldPreventDefault(submission: Submission<unknown>): boolean {
 	if (submission.state === 'accepted') {
 		return false;
@@ -116,7 +63,8 @@ export function createRegistry(
 			lastResult?: SubmissionResult,
 		) {
 			if (store.has(formId)) {
-				throw new Error(`Form#${formId} already exists`);
+				// eslint-disable-next-line no-console
+				console.warn(`Form#${formId} already exists`);
 			}
 
 			store.set(formId, {
@@ -129,8 +77,6 @@ export function createRegistry(
 				},
 				subscribers: [],
 			});
-
-			console.log(`#${formId}`, 'initialized', store.get(formId));
 
 			config.onUpdate?.('add', formId);
 
@@ -206,7 +152,7 @@ export function createRegistry(
 
 					for (const name of Object.keys({ ...form.error, ...result.error })) {
 						const prev = form.error[name] ?? [];
-						const next = (result.error[name] ?? []).map(message => {
+						const next = (result.error[name] ?? []).map((message) => {
 							if (message.startsWith(skippedPrefix)) {
 								const actualMessage = message.slice(skippedPrefix.length);
 
@@ -266,8 +212,6 @@ export function createRegistry(
 						state: result.state,
 					});
 
-					console.log(`#${formId}`, 'updated', store.get(formId));
-
 					const subscribers = new Set(form.subscribers);
 
 					for (const update of updates) {
@@ -295,7 +239,7 @@ export function createRegistry(
 
 					if (result.update?.focusField ?? true) {
 						// Update focus
-						focusFirstInvalidControl(formElement);
+						focusFirstInvalidField(formElement);
 					}
 				},
 				handleEvent(
@@ -352,8 +296,6 @@ export function createRegistry(
 						subscribers: form.subscribers,
 					});
 
-					console.log(`#${formId}`, 'reset', store.get(formId));
-
 					// Notify all subscribers
 					for (const { callback } of form.subscribers) {
 						callback();
@@ -361,14 +303,7 @@ export function createRegistry(
 				},
 			};
 		},
-		remove(formId: string) {
-			config.onUpdate?.('remove', formId);
-
-			if (!store.delete(formId)) {
-				// eslint-disable-next-line no-console
-				console.warn(`Form#${formId} does not exist`);
-			}
-		},
+		remove(formId: string) {},
 		getForm(formId: string) {
 			return getForm(formId);
 		},

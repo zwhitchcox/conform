@@ -4,7 +4,7 @@ import nodeResolve from '@rollup/plugin-node-resolve';
 import copy from 'rollup-plugin-copy';
 
 /** @returns {import("rollup").RollupOptions[]} */
-function configurePackage(name, experimental = false) {
+function configurePackage(name) {
 	let sourceDir = `packages/${name}`;
 	let outputDir = `${sourceDir}`;
 
@@ -13,10 +13,7 @@ function configurePackage(name, experimental = false) {
 		external(id) {
 			return !id.startsWith('.') && !path.isAbsolute(id);
 		},
-		input: experimental ? [
-			`${sourceDir}/index.ts`,
-			`${sourceDir}/experimental/index.ts`
-		]: `${sourceDir}/index.ts`,
+		input: `${sourceDir}/index.ts`,
 		output: {
 			dir: outputDir,
 			format: 'esm',
@@ -32,10 +29,9 @@ function configurePackage(name, experimental = false) {
 			nodeResolve({
 				extensions: ['.ts', '.tsx'],
 			}),
-			!name.endsWith('experimental') ?
 			copy({
 				targets: [{ src: `LICENSE`, dest: sourceDir }],
-			}) : null,
+			}),
 		],
 	};
 
@@ -44,10 +40,7 @@ function configurePackage(name, experimental = false) {
 		external(id) {
 			return !id.startsWith('.') && !path.isAbsolute(id);
 		},
-		input: experimental ? [
-			`${sourceDir}/index.ts`,
-			`${sourceDir}/experimental/index.ts`
-		]: `${sourceDir}/index.ts`,
+		input: `${sourceDir}/index.ts`,
 		output: {
 			dir: outputDir,
 			format: 'cjs',
@@ -72,14 +65,14 @@ function configurePackage(name, experimental = false) {
 export default function rollup() {
 	return [
 		// Base
-		...configurePackage('conform-dom', true),
+		...configurePackage('conform-dom'),
 		...configurePackage('conform-validitystate'),
 
 		// Schema resolver
-		...configurePackage('conform-zod', true),
-		...configurePackage('conform-yup'),
+		...configurePackage('conform-zod'),
+		// ...configurePackage('conform-yup'),
 
 		// View adapter
-		...configurePackage('conform-react', true),
+		...configurePackage('conform-react'),
 	];
 }

@@ -131,18 +131,9 @@ export function resolve(
 /**
  * Format the error messages into a validation message
  */
-export function getValidationMessage(errors?: string[]): string {
-	return errors?.join(String.fromCharCode(31)) ?? '';
-}
-
-/**
- * Retrieve the error messages from the validation message
- */
-export function getErrors(validationMessage: string | undefined): string[] {
-	// Empty string should be considered no error as well
-	if (!validationMessage) {
-		return [];
-	}
-
-	return validationMessage.split(String.fromCharCode(31));
+export function getValidationMessage(
+	errors?: string[],
+	delimiter = String.fromCharCode(31),
+): string {
+	return errors?.join(delimiter) ?? '';
 }

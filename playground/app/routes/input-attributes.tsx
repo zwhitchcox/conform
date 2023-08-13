@@ -1,5 +1,5 @@
-import { type SubmissionResult } from '@conform-to/dom/experimental';
-import { conform, useForm } from '@conform-to/react/experimental';
+import { type SubmissionResult } from '@conform-to/dom';
+import { conform, useForm } from '@conform-to/react';
 import { json, type ActionArgs, type LoaderArgs } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
 import { Playground, Field, Alert } from '~/components';
@@ -28,7 +28,15 @@ export async function action({ request }: ActionArgs) {
 	const error: Record<string, string[]> = {};
 	const validated: Record<string, boolean> = {};
 
-	for (const name of ['title', 'description', 'rating', 'images', 'tags', 'released', 'languages']) {
+	for (const name of [
+		'title',
+		'description',
+		'rating',
+		'images',
+		'tags',
+		'released',
+		'languages',
+	]) {
 		const values = formData.getAll(name);
 
 		validated[name] = true;
@@ -41,9 +49,7 @@ export async function action({ request }: ActionArgs) {
 				if (typeof prev === 'undefined') {
 					payload[name] = next;
 				} else {
-					payload[name] = Array.isArray(prev)
-						? [...prev, next]
-						: [prev, next];
+					payload[name] = Array.isArray(prev) ? [...prev, next] : [prev, next];
 				}
 			}
 		}
@@ -54,7 +60,7 @@ export async function action({ request }: ActionArgs) {
 		error: {
 			...error,
 			'': ['invalid'],
-			released: ['invalid']
+			released: ['invalid'],
 		},
 		state: {
 			validated,

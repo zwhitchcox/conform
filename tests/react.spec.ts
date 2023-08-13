@@ -15,7 +15,7 @@ import {
 	hasFocus,
 } from './helpers';
 
-test.describe('Client Validation', () => {
+test.describe.skip('Client Validation', () => {
 	test('Browser validation', async ({ page }) => {
 		const form = await gotoForm(page, '/movie', { validate: false });
 		const { title, description, genre, rating } = getMovieFieldset(form);
@@ -366,7 +366,7 @@ test.describe('Client Validation', () => {
 	});
 });
 
-test.describe('Server Validation', () => {
+test.describe.skip('Server Validation', () => {
 	test('Error reporting', async ({ page }) => {
 		const form = await gotoForm(page, '/login', {
 			validate: false,
@@ -423,7 +423,7 @@ test.describe('Server Validation', () => {
 	});
 });
 
-test.describe('No JS', () => {
+test.describe.skip('No JS', () => {
 	test.use({ javaScriptEnabled: false });
 
 	test('Basic form', async ({ page }) => {

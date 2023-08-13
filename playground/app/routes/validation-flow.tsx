@@ -1,5 +1,5 @@
-import { FormState, conform, useForm } from '@conform-to/react/experimental';
-import { parse } from '@conform-to/zod/experimental';
+import { FormState, conform, useForm } from '@conform-to/react';
+import { parse } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
@@ -72,10 +72,16 @@ export default function ValidationFlow() {
 					<input {...conform.input(form.fields.email, { type: 'email' })} />
 				</Field>
 				<Field label="Password" config={form.fields.password}>
-					<input {...conform.input(form.fields.password, { type: 'password' })} />
+					<input
+						{...conform.input(form.fields.password, { type: 'password' })}
+					/>
 				</Field>
 				<Field label="Confirm password" config={form.fields.confirmPassword}>
-					<input {...conform.input(form.fields.confirmPassword, { type: 'password' })} />
+					<input
+						{...conform.input(form.fields.confirmPassword, {
+							type: 'password',
+						})}
+					/>
 				</Field>
 				{showInputWithNoName ? (
 					<Field label="Input with no name">

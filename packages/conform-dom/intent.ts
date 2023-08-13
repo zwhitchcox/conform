@@ -94,6 +94,7 @@ export function requestIntent(
 	},
 ): void {
 	if (!form) {
+		// eslint-disable-next-line no-console
 		console.warn('No form element is provided');
 		return;
 	}

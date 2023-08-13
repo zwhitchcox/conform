@@ -1,5 +1,5 @@
-import { useForm, conform } from '@conform-to/react/experimental';
-import { parse } from '@conform-to/zod/experimental';
+import { useForm, conform } from '@conform-to/react';
+import { parse } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { Form, Link, useActionData, useLoaderData } from '@remix-run/react';

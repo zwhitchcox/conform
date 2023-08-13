@@ -1,4 +1,4 @@
-import { ConformBoundary } from '@conform-to/react/experimental';
+import { ConformBoundary } from '@conform-to/react';
 import type { V2_MetaFunction, LinksFunction } from '@remix-run/node';
 import {
 	Links,
