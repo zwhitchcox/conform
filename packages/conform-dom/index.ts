@@ -6,6 +6,7 @@ export {
 	type Form,
 	type FormAttributes,
 	type FormState,
+	type FieldName,
 	type FieldElement,
 	type SubmissionContext,
 	type Submission,
@@ -16,7 +17,7 @@ export {
 	type DefaultValue,
 } from './types.js';
 export { isFieldElement } from './dom.js';
-export { invariant, flatten, resolve } from './util.js';
+export { invariant } from './util.js';
 export {
 	list,
 	validate,
@@ -24,4 +25,4 @@ export {
 	parseIntent,
 	updateList,
 } from './intent.js';
-export { formatPaths, setValue } from './formdata.js';
+export { formatPaths, setValue, flatten, resolveEntries } from './formdata.js';

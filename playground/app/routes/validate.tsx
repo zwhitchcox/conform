@@ -1,5 +1,5 @@
 import { validate } from '@conform-to/dom';
-import { conform, useForm } from '@conform-to/react';
+import { FormState, conform, useForm } from '@conform-to/react';
 import { parse } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
@@ -39,6 +39,7 @@ export default function Validate() {
 
 	return (
 		<Form method="post" {...conform.form(form)}>
+			<FormState formId={form.id} />
 			<Playground title="Validate" lastSubmission={lastResult}>
 				<Field label="Name" config={form.fields.name}>
 					<input {...conform.input(form.fields.name, { type: 'text' })} />

@@ -22,24 +22,24 @@ export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
 	const submission = parse(formData, { schema });
 
-	return json(submission);
+	return json(submission.report());
 }
 
 export default function Example() {
 	const { noClientValidate } = useLoaderData<typeof loader>();
-	const lastSubmission = useActionData<typeof action>();
-	const [form, { name }] = useForm({
-		lastSubmission,
+	const lastResult = useActionData<typeof action>();
+	const form = useForm({
+		lastResult,
 		onValidate: !noClientValidate
 			? ({ formData }) => parse(formData, { schema })
 			: undefined,
 	});
 
 	return (
-		<Form method="post" {...form.props}>
-			<Playground title="Template Form" lastSubmission={lastSubmission}>
-				<Field label="Name" config={name}>
-					<input {...conform.input(name, { type: 'text' })} />
+		<Form method="post" {...conform.form(form)}>
+			<Playground title="Template Form" lastSubmission={lastResult}>
+				<Field label="Name" config={form.fields.name}>
+					<input {...conform.input(form.fields.name, { type: 'text' })} />
 				</Field>
 			</Playground>
 		</Form>

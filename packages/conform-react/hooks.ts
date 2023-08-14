@@ -4,6 +4,7 @@ import {
 	type Constraint,
 	type Registry,
 	type FieldElement,
+	type FieldName,
 	type SubmissionContext,
 	type SubmissionResult,
 	type Submission,
@@ -11,7 +12,7 @@ import {
 	type Form as FormMetadata,
 	createRegistry,
 	flatten,
-	resolve,
+	resolveEntries,
 	requestIntent,
 	validate,
 	isFieldElement,
@@ -30,8 +31,6 @@ import {
 	useLayoutEffect,
 	useCallback,
 } from 'react';
-
-export type FieldName<Type> = string & { __type?: Type };
 
 export interface Form<Type>
 	extends Pick<
@@ -85,7 +84,7 @@ export function useNoValidate(defaultNoValidate = true): boolean {
 }
 
 export function FormState({ formId }: { formId: string }): React.ReactElement {
-	const form = useFormMetadata({ formId });
+	const form = useFormSubscription({ formId });
 
 	return createElement(
 		'fieldset',
@@ -99,17 +98,19 @@ export function FormState({ formId }: { formId: string }): React.ReactElement {
 	);
 }
 
-export function ConformBoundary({
-	children,
-}: {
+export function ConformBoundary(props: {
 	children: React.ReactNode;
 }): React.ReactElement {
 	const [registry] = useState(() => createRegistry());
 
-	return createElement(RegistryContext.Provider, { value: registry }, children);
+	return createElement(
+		RegistryContext.Provider,
+		{ value: registry },
+		props.children,
+	);
 }
 
-export function useFormMetadata(config: {
+export function useFormSubscription(config: {
 	formId: string;
 	name?: string;
 	state?: {
@@ -299,7 +300,7 @@ export function useFieldset<Type>(config: {
 	name?: FieldName<Type>;
 }): Fieldset<Type> {
 	const field = useField({ formId: config.formId, name: config.name ?? '' });
-	const metadata = useFormMetadata({
+	const metadata = useFormSubscription({
 		formId: config.formId,
 		name: config.name,
 		state: {
@@ -337,20 +338,28 @@ export function useFieldList<Item>(config: {
 	formId: string;
 	name: FieldName<Item[]>;
 }): FieldList<Item> {
-	const field = useField({
-		...config,
-		// intent: list,
-	});
-	const metadata = useFormMetadata({
+	const field = useField(config);
+	const metadata = useFormSubscription({
 		...config,
 		state: {
 			error: true,
 			list: true,
 		},
 	});
-	const entries =
-		metadata.state.list[config.name] ??
-		Object.keys(resolve(metadata.initialValue, config.name) ?? {});
+	const entries = useMemo(
+		() =>
+			metadata.state.list[config.name] ??
+			Object.keys(
+				resolveEntries(Object.entries(metadata.initialValue), (key) => {
+					if (!key.startsWith(`${config.name}`)) {
+						return null;
+					}
+
+					return key.slice(config.name.length + 1);
+				}) ?? [],
+			),
+		[config.name, metadata.initialValue, metadata.state.list],
+	);
 
 	return {
 		...field,
@@ -372,9 +381,8 @@ export function useFieldList<Item>(config: {
 export function useField<Type>(config: {
 	formId: string;
 	name: FieldName<Type>;
-	intent?: Record<string, any>;
 }): Field<Type> {
-	const metadata = useFormMetadata({
+	const metadata = useFormSubscription({
 		formId: config.formId,
 		name: config.name,
 		state: {
@@ -389,8 +397,6 @@ export function useField<Type>(config: {
 		defaultValue: metadata.initialValue[name] as any,
 		constraint: metadata.attributes.constraint[name] ?? {},
 		errors: metadata.error[name] ?? [],
-		// TODO: bind each intent creator with the formId and name
-		// intent: config.intent,
 	};
 }
 

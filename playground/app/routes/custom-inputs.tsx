@@ -1,4 +1,4 @@
-import { conform, useForm, useInputEvent } from '@conform-to/react';
+import { FormState, conform, useForm, useInputEvent } from '@conform-to/react';
 import { parse } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
@@ -45,6 +45,7 @@ export default function Example() {
 
 	return (
 		<Form method="post" {...conform.form(form)}>
+			<FormState formId={form.id} />
 			<Playground title="Custom Inputs Form" lastSubmission={lastResult}>
 				<Field label="Headless ListBox" config={form.fields.language}>
 					<CustomSelect

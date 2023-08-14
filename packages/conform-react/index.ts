@@ -1,12 +1,12 @@
 export {
 	type Submission,
+	type FieldName,
 	list,
 	validate,
 	requestIntent,
 	isFieldElement,
 } from '@conform-to/dom';
 export {
-	type FieldName,
 	ConformBoundary,
 	FormState,
 	useForm,

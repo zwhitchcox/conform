@@ -4,7 +4,6 @@
  *
  * @see https://developer.mozilla.org/en-US/docs/Web/API/FormData/FormData#parameters
  */
-
 export function getFormData(
 	form: HTMLFormElement,
 	submitter?: HTMLInputElement | HTMLButtonElement | null,
@@ -99,33 +98,98 @@ export function setValue<Value>(
 }
 
 /**
- * Resolves the payload into a plain object based on the JS syntax convention
+ * Resolves the entries into a plain object based on the JS syntax convention
  */
-export function resolve(
-	payload: FormData | URLSearchParams,
-	options: {
-		ignoreKeys?: string[];
-	} = {},
-) {
-	const data = {};
+export function resolveEntries(
+	entries: Array<[string, unknown]> | IterableIterator<[string, unknown]>,
+	resolveName: (key: string) => string | null,
+): Record<string, unknown> | Array<unknown> | undefined {
+	const data: { result?: Record<string, unknown> | Array<unknown> } = {};
 
-	for (const [key, value] of payload.entries()) {
-		if (options.ignoreKeys?.includes(key)) {
+	for (const [key, value] of entries) {
+		const name = resolveName(key);
+
+		if (!name) {
 			continue;
 		}
 
-		setValue(data, key, (prev) => {
-			if (!prev) {
-				return value;
-			} else if (Array.isArray(prev)) {
-				return prev.concat(value);
-			} else {
-				return [prev, value];
-			}
-		});
+		setValue(
+			data,
+			`result${name.startsWith('[') ? '' : '.'}${name}`,
+			(prev) => {
+				if (!prev) {
+					return value;
+				} else if (Array.isArray(prev)) {
+					return prev.concat(value);
+				} else {
+					return [prev, value];
+				}
+			},
+		);
 	}
 
-	return data;
+	return data.result;
+}
+
+export function flatten(
+	data: Record<string, unknown> | Array<unknown>,
+	prefix: string = '',
+): Record<string, string | string[]> {
+	const result: Record<string, string | string[]> = {};
+
+	function processObject(obj: Object, prefix: string): void {
+		for (const [key, value] of Object.entries(obj)) {
+			const name = prefix ? `${prefix}.${key}` : key;
+
+			if (Array.isArray(value)) {
+				processArray(value, name);
+			} else if (value instanceof File) {
+				continue;
+			} else if (
+				!(value instanceof Date) &&
+				typeof value === 'object' &&
+				value !== null
+			) {
+				processObject(value, name);
+			} else {
+				result[name] = value;
+			}
+		}
+	}
+
+	function processArray(array: any[], prefix: string): void {
+		// This creates an additional entry in case of checkbox group
+		if (array.every((item) => typeof item === 'string')) {
+			result[prefix] = array as string[];
+		}
+
+		for (let i = 0; i < array.length; i++) {
+			const item = array[i];
+			const name = `${prefix}[${i}]`;
+
+			if (Array.isArray(item)) {
+				processArray(item, name);
+			} else if (item instanceof File) {
+				continue;
+			} else if (
+				!(item instanceof Date) &&
+				typeof item === 'object' &&
+				item !== null
+			) {
+				processObject(item, name);
+			} else {
+				result[name] = item;
+			}
+		}
+	}
+
+	if (Array.isArray(data)) {
+		processArray(data, prefix);
+	} else {
+		processObject(data, prefix);
+	}
+
+	return result;
 }
 
 /**

@@ -7,7 +7,7 @@ import {
 	flatten,
 	invariant,
 	formatPaths,
-	parseIntent as oldParseIntent,
+	parseIntent,
 	setValue,
 	updateList,
 } from '@conform-to/dom';
@@ -65,22 +65,15 @@ function getError(
 	}, {});
 }
 
-function parseState(payload: FormData | URLSearchParams): FormState {
+function resolveState(payload: FormData | URLSearchParams): FormState {
 	const prevState = payload.get('__state__');
-
-	if (!prevState) {
-		return {
-			validated: {},
-			list: {},
-		};
-	}
 
 	invariant(typeof prevState === 'string', 'Invalid state');
 
 	return JSON.parse(prevState);
 }
 
-function parseIntent(payload: FormData | URLSearchParams) {
+function resolveIntent(payload: FormData | URLSearchParams) {
 	const intent = payload.get('__intent__');
 
 	if (!intent) {
@@ -94,7 +87,7 @@ function parseIntent(payload: FormData | URLSearchParams) {
 
 	return {
 		intent,
-		result: oldParseIntent(intent),
+		result: parseIntent(intent),
 	};
 }
 
@@ -190,8 +183,8 @@ export function parse<Schema extends ZodTypeAny>(
 ):
 	| Submission<output<Schema>, input<Schema>>
 	| Promise<Submission<output<Schema>, input<Schema>>> {
-	const { intent, result } = parseIntent(payload);
-	const state = parseState(payload);
+	const { intent, result } = resolveIntent(payload);
+	const state = resolveState(payload);
 	const data: Record<string, unknown> = {};
 
 	for (const [name, value] of payload.entries()) {

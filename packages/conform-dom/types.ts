@@ -18,6 +18,8 @@ export type DefaultValue<Schema> = Schema extends Primitive
 	? { [Key in KeysOf<Schema>]?: DefaultValue<KeyType<Schema, Key>> }
 	: any;
 
+export type FieldName<Type> = string & { __type?: Type };
+
 export type FieldElement =
 	| HTMLInputElement
 	| HTMLSelectElement

@@ -1,4 +1,4 @@
-import { useForm, conform } from '@conform-to/react';
+import { useForm, conform, FormState } from '@conform-to/react';
 import { parse } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
@@ -78,6 +78,7 @@ export default function ExampleForm() {
 
 	return (
 		<Form method="post" {...conform.form(form)}>
+			<FormState formId={form.id} />
 			<Playground
 				title="Payment Form"
 				description={
