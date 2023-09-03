@@ -1,3 +1,5 @@
+import { invariant } from './util.js';
+
 /**
  * A ponyfill-like helper to get the form data with the submitter value.
  * It does not respect the tree order nor handles the image input.
@@ -97,38 +99,34 @@ export function setValue<Value>(
 	return pointer;
 }
 
-/**
- * Resolves the entries into a plain object based on the JS syntax convention
- */
-export function resolveEntries(
-	entries: Array<[string, unknown]> | IterableIterator<[string, unknown]>,
-	resolveName: (key: string) => string | null,
-): Record<string, unknown> | Array<unknown> | undefined {
+export function resolveList(
+	defaultValue: Record<string, unknown>,
+	name: string,
+): Array<unknown> {
 	const data: { result?: Record<string, unknown> | Array<unknown> } = {};
 
-	for (const [key, value] of entries) {
-		const name = resolveName(key);
-
-		if (!name) {
+	for (const [key, value] of Object.entries(defaultValue)) {
+		if (!key.startsWith(name)) {
 			continue;
 		}
 
-		setValue(
-			data,
-			`result${name.startsWith('[') ? '' : '.'}${name}`,
-			(prev) => {
-				if (!prev) {
-					return value;
-				} else if (Array.isArray(prev)) {
-					return prev.concat(value);
-				} else {
-					return [prev, value];
-				}
-			},
-		);
+		setValue(data, key.replace(name, 'result'), (prev) => {
+			if (!prev) {
+				return value;
+			} else if (Array.isArray(prev)) {
+				return prev.concat(value);
+			} else {
+				return [prev, value];
+			}
+		});
 	}
 
-	return data.result;
+	invariant(
+		typeof data.result === 'undefined' || Array.isArray(data.result),
+		'The defaultValue cannot be resolved to a list',
+	);
+
+	return data.result ?? [];
 }
 
 export function flatten(

@@ -13,7 +13,6 @@ export {
 	type SubmissionResult,
 	type ReportOptions,
 	type Primitive,
-	type FormUpdate,
 	type DefaultValue,
 } from './types.js';
 export { isFieldElement } from './dom.js';
@@ -25,4 +24,4 @@ export {
 	parseIntent,
 	updateList,
 } from './intent.js';
-export { formatPaths, setValue, flatten, resolveEntries } from './formdata.js';
+export { formatPaths, setValue, resolveList, flatten } from './formdata.js';

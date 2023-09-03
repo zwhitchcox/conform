@@ -64,7 +64,7 @@ export async function action({ request }: ActionArgs) {
 		},
 		state: {
 			validated,
-			list: {},
+			listKeys: {},
 		},
 	});
 }

@@ -117,7 +117,7 @@ async function runValidationScenario(page: Page) {
 	await expect(playground.submission).toHaveText(
 		JSON.stringify(
 			{
-				payload: {
+				initialValue: {
 					email: 'hey@conform.guide',
 					title: 'Software Developer',
 				},
@@ -127,8 +127,9 @@ async function runValidationScenario(page: Page) {
 						email: true,
 						title: true,
 					},
-					list: {},
-				}
+					listKeys: {},
+				},
+				autoFocus: true,
 			},
 			null,
 			2,

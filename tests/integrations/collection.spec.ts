@@ -20,7 +20,7 @@ async function runValidationScenario(page: Page) {
 	await expect(playground.submission).toHaveText(
 		JSON.stringify(
 			{
-				payload: {
+				initialValue: {
 					singleChoice: 'y',
 					multipleChoice: 'c',
 				},
@@ -30,8 +30,9 @@ async function runValidationScenario(page: Page) {
 						singleChoice: true,
 						multipleChoice: true,
 					},
-					list: {},
+					listKeys: {},
 				},
+				autoFocus: true,
 			},
 			null,
 			2,
@@ -45,7 +46,7 @@ async function runValidationScenario(page: Page) {
 	await expect(playground.submission).toHaveText(
 		JSON.stringify(
 			{
-				payload: {
+				initialValue: {
 					singleChoice: 'y',
 					multipleChoice: ['a', 'c'],
 					'multipleChoice[0]': 'a',
@@ -57,8 +58,9 @@ async function runValidationScenario(page: Page) {
 						singleChoice: true,
 						multipleChoice: true,
 					},
-					list: {},
+					listKeys: {},
 				},
+				autoFocus: true,
 			},
 			null,
 			2,

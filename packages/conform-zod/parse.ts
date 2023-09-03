@@ -3,7 +3,6 @@ import {
 	type SubmissionResult,
 	type ReportOptions,
 	type FormState,
-	type FormUpdate,
 	flatten,
 	invariant,
 	formatPaths,
@@ -97,12 +96,13 @@ function report(
 ): SubmissionResult {
 	if (options?.resetForm) {
 		return {
-			payload: null,
+			initialValue: null,
 			error: {},
 			state: {
 				validated: {},
-				list: {},
+				listKeys: {},
 			},
+			autoFocus: false,
 		};
 	}
 
@@ -114,8 +114,7 @@ function createSubmission<Input, Output>(
 	context: {
 		intent: string | null;
 		state: any | null;
-		defaultValue: Record<string, string | string[]> | null;
-		update?: FormUpdate;
+		initialValue: Record<string, string | string[]> | null;
 	},
 ): Submission<Output> {
 	if (!result.success || context.intent) {
@@ -128,10 +127,10 @@ function createSubmission<Input, Output>(
 			report(options) {
 				return report(
 					{
-						payload: context.defaultValue,
+						initialValue: context.initialValue,
 						error,
 						state: context.state,
-						update: context.update,
+						autoFocus: context.intent === null,
 					},
 					options,
 				);
@@ -146,10 +145,10 @@ function createSubmission<Input, Output>(
 		report(options) {
 			return report(
 				{
-					payload: context.defaultValue,
+					initialValue: context.initialValue,
 					error: {},
 					state: context.state,
-					update: context.update,
+					autoFocus: context.intent === null,
 				},
 				options,
 			);
@@ -199,24 +198,36 @@ export function parse<Schema extends ZodTypeAny>(
 		}
 	}
 
-	let update: FormUpdate | undefined = undefined;
-
 	switch (result?.type) {
 		case 'validate': {
 			state.validated[result.payload] = true;
-			update = {
-				focusField: false,
-			};
 			break;
 		}
 		case 'list': {
-			const defaultList = setValue(data, result.payload.name, (list) => {
+			const list = setValue(data, result.payload.name, (list: unknown) => {
 				if (typeof list !== 'undefined' && !Array.isArray(list)) {
 					throw new Error('The list intent can only be applied to a list');
 				}
 
-				return updateList(list ?? [], result.payload);
+				return list ?? [];
 			});
+			const keys = state.listKeys[result.payload.name] ?? Object.keys(list);
+
+			updateList(list, result.payload);
+
+			switch (result.payload.operation) {
+				case 'append':
+				case 'prepend':
+				case 'replace':
+					updateList<string>(keys, {
+						...result.payload,
+						defaultValue: (Date.now() * Math.random()).toString(36),
+					});
+					break;
+				default:
+					updateList(keys, result.payload);
+					break;
+			}
 
 			if (
 				result.payload.operation === 'remove' ||
@@ -232,33 +243,7 @@ export function parse<Schema extends ZodTypeAny>(
 			}
 
 			state.validated[result.payload.name] = true;
-			update = {
-				focusField: false,
-				remove: [result.payload.name],
-				override: flatten(defaultList, result.payload.name),
-			};
-
-			let list = state.list[result.payload.name];
-
-			if (!list) {
-				list = Object.keys(defaultList);
-			} else {
-				switch (result.payload.operation) {
-					case 'append':
-					case 'prepend':
-					case 'replace':
-						updateList<string>(list, {
-							...result.payload,
-							defaultValue: (Date.now() * Math.random()).toString(36),
-						});
-						break;
-					default:
-						updateList(list, result.payload);
-						break;
-				}
-			}
-
-			state.list[result.payload.name] = list;
+			state.listKeys[result.payload.name] = keys;
 			break;
 		}
 	}
@@ -269,22 +254,20 @@ export function parse<Schema extends ZodTypeAny>(
 			? options.schema(intent)
 			: options.schema,
 	);
-	const defaultValue = flatten(data);
+	const initialValue = flatten(data);
 
 	return options.async
 		? schema.safeParseAsync(data, { errorMap }).then((result) =>
 				createSubmission(result, {
 					intent,
 					state,
-					update,
-					defaultValue,
+					initialValue,
 				}),
 		  )
 		: createSubmission(schema.safeParse(data, { errorMap }), {
 				intent,
 				state,
-				update,
-				defaultValue,
+				initialValue,
 		  });
 }
 
@@ -320,7 +303,7 @@ export function refine(
 	if (typeof options.when !== 'undefined' && !options.when) {
 		ctx.addIssue({
 			code: ZodIssueCode.custom,
-			message: `[VALIDATION_SKIPPED] ${options.message}`,
+			message: '__VALIDATION_SKIPPED__',
 			path: options.path,
 		});
 		return;
@@ -333,7 +316,7 @@ export function refine(
 		// Validate only if the constraint is defined
 		ctx.addIssue({
 			code: ZodIssueCode.custom,
-			message: `[VALIDATION_UNDEFINED] ${options.message}`,
+			message: `__VALIDATION_UNDEFINED__`,
 			path: options.path,
 		});
 		return;

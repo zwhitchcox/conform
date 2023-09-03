@@ -81,15 +81,16 @@ async function runValidationScenario(page: Page) {
 	await expect(playground.error).toHaveText(['', '', '']);
 
 	expect(JSON.parse(await playground.submission.innerText())).toEqual({
-		payload: {},
+		initialValue: {},
 		error: {},
 		state: {
 			validated: {
 				file: true,
 				files: true,
 			},
-			list: {},
+			listKeys: {},
 		},
+		autoFocus: true,
 	});
 }
 

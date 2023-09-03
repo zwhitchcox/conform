@@ -78,7 +78,7 @@ export type FormAttributes = {
 
 export type FormState = {
 	validated: Record<string, boolean>;
-	list: Record<string, Array<string>>;
+	listKeys: Record<string, Array<string>>;
 };
 
 export type SubmissionContext = {
@@ -104,14 +104,8 @@ export type ReportOptions = {
 };
 
 export type SubmissionResult<Type = any> = {
-	payload: Record<keyof Type | string, string | string[]> | null;
+	initialValue: Record<keyof Type | string, string | string[]> | null;
 	error: Record<keyof Type | string, string[]>;
 	state: FormState;
-	update?: FormUpdate;
-};
-
-export type FormUpdate = {
-	focusField?: boolean;
-	remove?: string[];
-	override?: Record<string, unknown>;
+	autoFocus: boolean;
 };

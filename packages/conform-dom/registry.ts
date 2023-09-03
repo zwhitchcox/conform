@@ -19,29 +19,7 @@ import { invariant } from './util.js';
 
 export type Registry = ReturnType<typeof createRegistry>;
 
-function shouldPreventDefault(submission: Submission<unknown>): boolean {
-	if (submission.state === 'accepted') {
-		return false;
-	}
-
-	const result = submission.report();
-
-	for (const messages of Object.values(result.error)) {
-		for (const message of messages) {
-			if (message.startsWith('[VALIDATION_UNDEFINED] ')) {
-				return false;
-			}
-		}
-	}
-
-	return true;
-}
-
-export function createRegistry(
-	config: {
-		onUpdate?: (type: 'add' | 'remove', formId: string) => void;
-	} = {},
-) {
+export function createRegistry() {
 	const store = new Map<string, Form>();
 
 	function getForm(formId: string) {
@@ -56,38 +34,61 @@ export function createRegistry(
 		return element;
 	}
 
+	function shouldPreventDefault(submission: Submission<unknown>): boolean {
+		if (submission.state === 'accepted') {
+			return false;
+		}
+
+		const result = submission.report();
+
+		for (const messages of Object.values(result.error)) {
+			if (messages.includes('__VALIDATION_UNDEFINED__')) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	return {
-		add(
+		register(
 			formId: string,
 			attributes: FormAttributes,
 			lastResult?: SubmissionResult,
 		) {
-			if (store.has(formId)) {
-				// eslint-disable-next-line no-console
-				console.warn(`Form#${formId} already exists`);
-			}
-
 			store.set(formId, {
 				attributes,
-				initialValue: lastResult?.payload ?? attributes.defaultValue,
+				initialValue: lastResult?.initialValue ?? attributes.defaultValue,
 				error: lastResult?.error ?? {},
 				state: lastResult?.state ?? {
 					validated: {},
-					list: {},
+					listKeys: {},
 				},
 				subscribers: [],
 			});
 
-			config.onUpdate?.('add', formId);
-
 			return {
 				id: formId,
-				submit(
+				initialize() {
+					// Mark the form as initialized
+					// Update default value
+
+					return () => {
+						// Mark the form as uninitialized
+					};
+				},
+				submit<Type>(
 					event: SubmitEvent,
 					config?: {
-						onValidate?: (context: SubmissionContext) => Submission<unknown>;
+						onValidate?: (context: SubmissionContext) => Submission<Type>;
 					},
-				) {
+				): {
+					formData: FormData;
+					action: ReturnType<typeof getFormAction>;
+					encType: ReturnType<typeof getFormEncType>;
+					method: ReturnType<typeof getFormMethod>;
+					submission?: Submission<Type>;
+				} {
 					const element = event.target as HTMLFormElement;
 					const submitter = event.submitter as
 						| HTMLButtonElement
@@ -141,30 +142,22 @@ export function createRegistry(
 					const form = getForm(formId);
 					const formElement = getFormElement(formId);
 
-					if (result.payload === null) {
+					if (result.initialValue === null) {
 						formElement.reset();
 						return;
 					}
 
 					const updates: Array<Update> = [];
 					const delimiter = String.fromCharCode(31);
-					const skippedPrefix = '[VALIDATION_SKIPPED] ';
 
 					for (const name of Object.keys({ ...form.error, ...result.error })) {
 						const prev = form.error[name] ?? [];
-						const next = (result.error[name] ?? []).map((message) => {
-							if (message.startsWith(skippedPrefix)) {
-								const actualMessage = message.slice(skippedPrefix.length);
+						const next = result.error[name] ?? [];
 
-								if (prev.includes(actualMessage)) {
-									return actualMessage;
-								}
-							}
-
-							return message;
-						});
-
-						if (next.join(delimiter) !== prev.join(delimiter)) {
+						if (
+							!next.includes('__VALIDATION_SKIPPED__') &&
+							next.join(delimiter) !== prev.join(delimiter)
+						) {
 							updates.push({ type: 'error', name, prev, next });
 						}
 					}
@@ -178,8 +171,8 @@ export function createRegistry(
 						}
 					}
 
-					for (const [name, value] of Object.entries(result.state.list)) {
-						const prev = form.state.list[name];
+					for (const [name, value] of Object.entries(result.state.listKeys)) {
+						const prev = form.state.listKeys[name];
 						const next = value;
 
 						if (JSON.stringify(next) !== JSON.stringify(prev)) {
@@ -187,57 +180,41 @@ export function createRegistry(
 						}
 					}
 
-					if (updates.length === 0) {
-						return;
-					}
-
 					store.set(formId, {
 						...form,
-						initialValue: Object.entries(form.initialValue).reduce(
-							(defaultValue, [name, value]) => {
-								if (
-									typeof defaultValue[name] === 'undefined' &&
-									!result.update?.remove?.some((prefix) =>
-										name.startsWith(prefix),
-									)
-								) {
-									defaultValue[name] = value;
-								}
-
-								return defaultValue;
-							},
-							result.update?.override ?? {},
-						),
+						initialValue: result.initialValue,
 						error: result.error,
 						state: result.state,
 					});
 
-					const subscribers = new Set(form.subscribers);
+					if (updates.length > 0) {
+						const subscribers = new Set(form.subscribers);
 
-					for (const update of updates) {
-						const element = formElement.elements.namedItem(update.name);
+						for (const update of updates) {
+							const element = formElement.elements.namedItem(update.name);
 
-						// Set custom validity only if the element has a name
-						if (
-							isFieldElement(element) &&
-							element.name &&
-							update.type === 'error'
-						) {
-							element.setCustomValidity(update.next.join(', '));
-						}
+							// Set custom validity only if the element has a name
+							if (
+								isFieldElement(element) &&
+								element.name &&
+								update.type === 'error'
+							) {
+								element.setCustomValidity(update.next.join(', '));
+							}
 
-						for (const subscriber of subscribers) {
-							if (subscriber.shouldNotify(update)) {
-								// Notify subscribers
-								subscriber.callback();
+							for (const subscriber of subscribers) {
+								if (subscriber.shouldNotify(update)) {
+									// Notify subscribers
+									subscriber.callback();
 
-								// Notified subscribers are removed from the set
-								subscribers.delete(subscriber);
+									// Notified subscribers are removed from the set
+									subscribers.delete(subscriber);
+								}
 							}
 						}
 					}
 
-					if (result.update?.focusField ?? true) {
+					if (result.autoFocus) {
 						// Update focus
 						focusFirstInvalidField(formElement);
 					}
@@ -291,7 +268,7 @@ export function createRegistry(
 						error: {},
 						state: {
 							validated: {},
-							list: {},
+							listKeys: {},
 						},
 						subscribers: form.subscribers,
 					});
@@ -303,7 +280,6 @@ export function createRegistry(
 				},
 			};
 		},
-		remove(formId: string) {},
 		getForm(formId: string) {
 			return getForm(formId);
 		},

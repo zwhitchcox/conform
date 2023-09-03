@@ -56,7 +56,7 @@ async function runValidationScenario(page: Page) {
 	await expect(playground.submission).toHaveText(
 		JSON.stringify(
 			{
-				payload: {
+				initialValue: {
 					username: '@Conform2023',
 				},
 				error: {},
@@ -64,8 +64,9 @@ async function runValidationScenario(page: Page) {
 					validated: {
 						username: true,
 					},
-					list: {},
+					listKeys: {},
 				},
+				autoFocus: true,
 			},
 			null,
 			2,

@@ -12,10 +12,10 @@ import {
 	type Form as FormMetadata,
 	createRegistry,
 	flatten,
-	resolveEntries,
 	requestIntent,
 	validate,
 	isFieldElement,
+	resolveList,
 } from '@conform-to/dom';
 import {
 	type RefObject,
@@ -190,7 +190,7 @@ export function useForm<
 	const formId = useFormId(config.id);
 	const registry = useRegistry();
 	const registerForm = () =>
-		registry.add(
+		registry.register(
 			formId,
 			{
 				defaultValue: flatten(config.defaultValue ?? {}),
@@ -205,10 +205,7 @@ export function useForm<
 		setForm(registerForm);
 	}
 
-	useEffect(() => {
-		// Cleanup the form metadata when the component unmounts
-		return () => registry.remove(formId);
-	}, [registry, formId]);
+	useEffect(() => form.initialize(), [form]);
 
 	const noValidate = useNoValidate(config.defaultNoValidate);
 	const configRef = useRef(config);
@@ -346,24 +343,16 @@ export function useFieldList<Item>(config: {
 			list: true,
 		},
 	});
-	const entries = useMemo(
+	const keys = useMemo(
 		() =>
-			metadata.state.list[config.name] ??
-			Object.keys(
-				resolveEntries(Object.entries(metadata.initialValue), (key) => {
-					if (!key.startsWith(`${config.name}`)) {
-						return null;
-					}
-
-					return key.slice(config.name.length + 1);
-				}) ?? [],
-			),
-		[config.name, metadata.initialValue, metadata.state.list],
+			metadata.state.listKeys?.[config.name] ??
+			Object.keys(resolveList(metadata.initialValue, config.name)),
+		[config.name, metadata.initialValue, metadata.state.listKeys],
 	);
 
 	return {
 		...field,
-		list: entries.map((key, index) => {
+		list: keys.map((key, index) => {
 			const name = `${config.name}[${index}]`;
 
 			return {

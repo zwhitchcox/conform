@@ -127,7 +127,7 @@ async function runValidationScenario(page: Page) {
 	// Trigger revalidation
 	await playground.submit.click();
 	await expect(playground.error).toHaveText(['', '', '']);
-	
+
 	// expect(JSON.parse(await playground.submission.innerText())).toEqual({
 	// 	payload: {
 	// 		'items[0]': 'Top item',
@@ -146,7 +146,7 @@ async function runValidationScenario(page: Page) {
 	// 			'items[1]': true,
 	// 			'items[2]': true,
 	// 		},
-	// 		list: {
+	// 		listKeys: {
 	// 			items: [expect.any(String), expect.any(String)]
 	// 		},
 	// 	},
