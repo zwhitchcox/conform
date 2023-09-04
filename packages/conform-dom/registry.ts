@@ -7,7 +7,7 @@ import {
 	focusFirstInvalidField,
 } from './dom.js';
 import type {
-	Form,
+	Entry,
 	FormAttributes,
 	FieldElement,
 	Submission,
@@ -20,12 +20,12 @@ import { invariant } from './util.js';
 export type Registry = ReturnType<typeof createRegistry>;
 
 export function createRegistry() {
-	const store = new Map<string, Form>();
+	const store = new Map<string, Entry>();
 
-	function getForm(formId: string) {
-		const state = store.get(formId);
-		invariant(typeof state !== 'undefined', `Form#${formId} does not exist`);
-		return state;
+	function getEntry(formId: string) {
+		const entry = store.get(formId);
+		invariant(typeof entry !== 'undefined', `Form#${formId} does not exist`);
+		return entry;
 	}
 
 	function getFormElement(formId: string) {
@@ -57,12 +57,14 @@ export function createRegistry() {
 			lastResult?: SubmissionResult,
 		) {
 			store.set(formId, {
-				attributes,
-				initialValue: lastResult?.initialValue ?? attributes.defaultValue,
-				error: lastResult?.error ?? {},
-				state: lastResult?.state ?? {
-					validated: {},
-					listKeys: {},
+				form: {
+					attributes,
+					initialValue: lastResult?.initialValue ?? attributes.defaultValue,
+					error: lastResult?.error ?? {},
+					state: lastResult?.state ?? {
+						validated: {},
+						listKeys: {},
+					},
 				},
 				subscribers: [],
 			});
@@ -139,7 +141,7 @@ export function createRegistry() {
 					return result;
 				},
 				update(result: SubmissionResult) {
-					const form = getForm(formId);
+					const entry = getEntry(formId);
 					const formElement = getFormElement(formId);
 
 					if (result.initialValue === null) {
@@ -150,8 +152,11 @@ export function createRegistry() {
 					const updates: Array<Update> = [];
 					const delimiter = String.fromCharCode(31);
 
-					for (const name of Object.keys({ ...form.error, ...result.error })) {
-						const prev = form.error[name] ?? [];
+					for (const name of Object.keys({
+						...entry.form.error,
+						...result.error,
+					})) {
+						const prev = entry.form.error[name] ?? [];
 						const next = result.error[name] ?? [];
 
 						if (
@@ -163,7 +168,7 @@ export function createRegistry() {
 					}
 
 					for (const [name, value] of Object.entries(result.state.validated)) {
-						const prev = form.state.validated[name];
+						const prev = entry.form.state.validated[name];
 						const next = value;
 
 						if (next !== Boolean(prev)) {
@@ -172,7 +177,7 @@ export function createRegistry() {
 					}
 
 					for (const [name, value] of Object.entries(result.state.listKeys)) {
-						const prev = form.state.listKeys[name];
+						const prev = entry.form.state.listKeys[name];
 						const next = value;
 
 						if (JSON.stringify(next) !== JSON.stringify(prev)) {
@@ -181,14 +186,17 @@ export function createRegistry() {
 					}
 
 					store.set(formId, {
-						...form,
-						initialValue: result.initialValue,
-						error: result.error,
-						state: result.state,
+						...entry,
+						form: {
+							...entry.form,
+							initialValue: result.initialValue,
+							error: result.error,
+							state: result.state,
+						},
 					});
 
 					if (updates.length > 0) {
-						const subscribers = new Set(form.subscribers);
+						const subscribers = new Set(entry.subscribers);
 
 						for (const update of updates) {
 							const element = formElement.elements.namedItem(update.name);
@@ -228,7 +236,7 @@ export function createRegistry() {
 						validated: boolean;
 					}) => void,
 				) {
-					const form = getForm(formId);
+					const entry = getEntry(formId);
 					const formElement = getFormElement(formId);
 					const element = event.target;
 
@@ -245,7 +253,7 @@ export function createRegistry() {
 						type: event.type,
 						form: formElement,
 						element,
-						validated: form.state.validated?.[element.name] ?? false,
+						validated: entry.form.state.validated?.[element.name] ?? false,
 					});
 				},
 				reset(event: Event, updatedAttributes?: FormAttributes) {
@@ -259,52 +267,54 @@ export function createRegistry() {
 						return;
 					}
 
-					const form = getForm(formId);
-					const attributes = updatedAttributes ?? form.attributes;
+					const entry = getEntry(formId);
+					const attributes = updatedAttributes ?? entry.form.attributes;
 
 					store.set(formId, {
-						attributes,
-						initialValue: attributes.defaultValue,
-						error: {},
-						state: {
-							validated: {},
-							listKeys: {},
+						form: {
+							attributes,
+							initialValue: attributes.defaultValue,
+							error: {},
+							state: {
+								validated: {},
+								listKeys: {},
+							},
 						},
-						subscribers: form.subscribers,
+						subscribers: entry.subscribers,
 					});
 
 					// Notify all subscribers
-					for (const { callback } of form.subscribers) {
+					for (const { callback } of entry.subscribers) {
 						callback();
 					}
 				},
 			};
 		},
 		getForm(formId: string) {
-			return getForm(formId);
+			return getEntry(formId).form;
 		},
 		subscribe(
 			formId: string,
 			callback: () => void,
 			shouldNotify = (update: Update) => true,
 		) {
-			const form = getForm(formId);
+			const entry = getEntry(formId);
 			const subscripition = {
 				shouldNotify,
 				callback,
 			};
 
 			store.set(formId, {
-				...form,
-				subscribers: [...form.subscribers, subscripition],
+				...entry,
+				subscribers: [...entry.subscribers, subscripition],
 			});
 
 			return () => {
-				const form = getForm(formId);
+				const entry = getEntry(formId);
 
 				store.set(formId, {
-					...form,
-					subscribers: form.subscribers.filter((sub) => sub !== subscripition),
+					...entry,
+					subscribers: entry.subscribers.filter((sub) => sub !== subscripition),
 				});
 			};
 		},

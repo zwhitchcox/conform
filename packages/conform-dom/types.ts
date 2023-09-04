@@ -34,6 +34,10 @@ export type Form = {
 	initialValue: Record<string, unknown>;
 	error: Record<string, string[]>;
 	state: FormState;
+};
+
+export type Entry = {
+	form: Form;
 	subscribers: Array<{
 		shouldNotify: (update: Update) => boolean;
 		callback: () => void;
