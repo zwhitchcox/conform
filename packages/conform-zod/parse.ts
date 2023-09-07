@@ -1,8 +1,8 @@
 import {
+	type FormState,
 	type Submission,
 	type SubmissionResult,
 	type ReportOptions,
-	type FormState,
 	flatten,
 	invariant,
 	formatPaths,
@@ -23,71 +23,54 @@ import {
 } from 'zod';
 import { enableTypeCoercion } from './coercion.js';
 
-function mergeValue<Type extends FormDataEntryValue>(
-	prev: Type | Type[] | undefined,
-	next: Type,
-): Type | Type[];
-function mergeValue<Type extends FormDataEntryValue>(
-	prev: Type | Type[] | undefined,
-	next: Type[],
-): Type[];
-function mergeValue<Type extends FormDataEntryValue>(
-	prev: Type | Type[] | undefined,
-	next: Type | Type[],
-): Type | Type[] {
-	if (!prev) {
-		return next;
-	} else if (Array.isArray(prev)) {
-		return prev.concat(next);
-	} else {
-		return ([] as Type[]).concat(prev, next);
+function resolve(payload: FormData | URLSearchParams) {
+	const state = payload.get('__state__');
+	const intent = payload.get('__intent__');
+	const data: Record<string, unknown> = {};
+	const fields: string[] = [];
+
+	invariant(
+		typeof state === 'string' &&
+			(typeof intent === 'string' || intent === null),
+		'Invalid form data',
+	);
+
+	for (const [name, next] of payload.entries()) {
+		if (name === '__intent__' || name === '__state__') {
+			continue;
+		}
+
+		fields.push(name);
+		setValue(data, name, (prev) => {
+			if (!prev) {
+				return next;
+			} else if (Array.isArray(prev)) {
+				return prev.concat(next);
+			} else {
+				return [prev, next];
+			}
+		});
 	}
+
+	return {
+		data,
+		intent,
+		state: JSON.parse(state),
+		fields,
+	};
 }
 
-function getError(
-	{ errors }: ZodError,
-	validated: Record<string, boolean>,
-	defaultValidated = false,
-): Record<string, string[]> {
+function getError({ errors }: ZodError): Record<string, string[]> {
 	return errors.reduce<Record<string, string[]>>((result, error) => {
 		const name = formatPaths(error.path);
+		const messages = result[name] ?? [];
 
-		if (defaultValidated && typeof validated[name] === 'undefined') {
-			validated[name] = true;
-		}
+		messages.push(error.message);
 
-		if (validated[name] ?? defaultValidated) {
-			result[name] = mergeValue(result[name], [error.message]);
-		}
+		result[name] = messages;
 
 		return result;
 	}, {});
-}
-
-function resolveState(payload: FormData | URLSearchParams): FormState {
-	const prevState = payload.get('__state__');
-
-	invariant(typeof prevState === 'string', 'Invalid state');
-
-	return JSON.parse(prevState);
-}
-
-function resolveIntent(payload: FormData | URLSearchParams) {
-	const intent = payload.get('__intent__');
-
-	if (!intent) {
-		return {
-			intent: null,
-			result: null,
-		};
-	}
-
-	invariant(typeof intent === 'string', 'Invalid intent');
-
-	return {
-		intent,
-		result: parseIntent(intent),
-	};
 }
 
 function report(
@@ -109,51 +92,128 @@ function report(
 	return result;
 }
 
-function createSubmission<Input, Output>(
-	result: SafeParseReturnType<Input, Output>,
-	context: {
-		intent: string | null;
-		state: any | null;
-		initialValue: Record<string, string | string[]> | null;
-	},
-): Submission<Output> {
-	if (!result.success || context.intent) {
-		const error = !result.success
-			? getError(result.error, context.state.validated, context.intent === null)
-			: {};
+interface SubmissionContext<Value> {
+	initialValue: Record<string, string | string[]> | null;
+	value: Value | null;
+	error: Record<string, string[]>;
+	state: FormState;
+	pending: boolean;
+}
 
-		return {
-			state: !result.success ? 'rejected' : 'pending',
-			report(options) {
-				return report(
-					{
-						initialValue: context.initialValue,
-						error,
-						state: context.state,
-						autoFocus: context.intent === null,
+function createSubmission<Value>(
+	context: SubmissionContext<Value>,
+): Submission<Value> {
+	const result: SubmissionResult = {
+		initialValue: context.initialValue,
+		error: !context.pending
+			? context.error
+			: Object.entries(context.error).reduce<Record<string, string[]>>(
+					(result, [name, messages]) => {
+						if (context.state.validated[name]) {
+							result[name] = messages;
+						}
+
+						return result;
 					},
-					options,
-				);
+					{},
+			  ),
+		state: context.state,
+		autoFocus: !context.pending,
+	};
+
+	if (context.pending) {
+		return {
+			state: 'pending',
+			report(options) {
+				return report(result, options);
+			},
+		};
+	}
+
+	if (!context.value) {
+		return {
+			state: 'rejected',
+			report(options) {
+				return report(result, options);
 			},
 		};
 	}
 
 	return {
 		state: 'accepted',
-		intent: context.intent,
-		value: result.data,
+		value: context.value,
 		report(options) {
-			return report(
-				{
-					initialValue: context.initialValue,
-					error: {},
-					state: context.state,
-					autoFocus: context.intent === null,
-				},
-				options,
-			);
+			return report(result, options);
 		},
 	};
+}
+
+interface FormContext {
+	intent: string | null;
+	state: FormState;
+	data: Record<string, unknown>;
+	fields: string[];
+}
+
+export function preprocess(
+	form: FormContext,
+): (error: Record<string, string[]>) => void {
+	const intent = form.intent ? parseIntent(form.intent) : null;
+
+	switch (intent?.type) {
+		case 'validate':
+			return () => {
+				form.state.validated[intent.payload] = true;
+			};
+		case 'list':
+			const payload = intent.payload;
+			const list = setValue(form.data, intent.payload.name, (list: unknown) => {
+				if (typeof list !== 'undefined' && !Array.isArray(list)) {
+					throw new Error('The list intent can only be applied to a list');
+				}
+
+				return list ?? [];
+			});
+			const defaultListKeys = Object.keys(list);
+
+			updateList(list, intent.payload);
+
+			return () => {
+				const keys = form.state.listKeys[payload.name] ?? defaultListKeys;
+
+				switch (payload.operation) {
+					case 'append':
+					case 'prepend':
+					case 'replace':
+						updateList(keys, {
+							...payload,
+							defaultValue: (Date.now() * Math.random()).toString(36),
+						});
+						break;
+					default:
+						updateList(keys, payload);
+						break;
+				}
+
+				form.state.listKeys[payload.name] = keys;
+
+				if (payload.operation === 'remove' || payload.operation === 'replace') {
+					for (const name of Object.keys(form.state.validated)) {
+						if (name.startsWith(`${payload.name}[${payload.index}]`)) {
+							form.state.validated[name] = false;
+						}
+					}
+				}
+
+				form.state.validated[payload.name] = true;
+			};
+		default:
+			return (error) => {
+				for (const name of [...form.fields, ...Object.keys(error)]) {
+					form.state.validated[name] = true;
+				}
+			};
+	}
 }
 
 export function parse<Schema extends ZodTypeAny>(
@@ -182,93 +242,46 @@ export function parse<Schema extends ZodTypeAny>(
 ):
 	| Submission<output<Schema>, input<Schema>>
 	| Promise<Submission<output<Schema>, input<Schema>>> {
-	const { intent, result } = resolveIntent(payload);
-	const state = resolveState(payload);
-	const data: Record<string, unknown> = {};
-
-	for (const [name, value] of payload.entries()) {
-		if (name === '__intent__' || name === '__state__') {
-			continue;
-		}
-
-		setValue(data, name, (prev) => mergeValue(prev as any, value));
-
-		if (!result) {
-			state.validated[name] = true;
-		}
-	}
-
-	switch (result?.type) {
-		case 'validate': {
-			state.validated[result.payload] = true;
-			break;
-		}
-		case 'list': {
-			const list = setValue(data, result.payload.name, (list: unknown) => {
-				if (typeof list !== 'undefined' && !Array.isArray(list)) {
-					throw new Error('The list intent can only be applied to a list');
-				}
-
-				return list ?? [];
-			});
-			const keys = state.listKeys[result.payload.name] ?? Object.keys(list);
-
-			updateList(list, result.payload);
-
-			switch (result.payload.operation) {
-				case 'append':
-				case 'prepend':
-				case 'replace':
-					updateList<string>(keys, {
-						...result.payload,
-						defaultValue: (Date.now() * Math.random()).toString(36),
-					});
-					break;
-				default:
-					updateList(keys, result.payload);
-					break;
-			}
-
-			if (
-				result.payload.operation === 'remove' ||
-				result.payload.operation === 'replace'
-			) {
-				for (const name of Object.keys(state.validated)) {
-					if (
-						name.startsWith(`${result.payload.name}[${result.payload.index}]`)
-					) {
-						state.validated[name] = false;
-					}
-				}
-			}
-
-			state.validated[result.payload.name] = true;
-			state.listKeys[result.payload.name] = keys;
-			break;
-		}
-	}
-
+	const form = resolve(payload);
+	const update = preprocess(form);
 	const errorMap = options.errorMap;
 	const schema = enableTypeCoercion(
 		typeof options.schema === 'function'
-			? options.schema(intent)
+			? options.schema(form.intent)
 			: options.schema,
 	);
-	const initialValue = flatten(data);
+	const resolveSubmission = <Input, Output>(
+		result: SafeParseReturnType<Input, Output>,
+		context: {
+			intent: string | null;
+			state: any | null;
+			data: Record<string, unknown>;
+			fields: string[];
+		},
+		updateState: (error: Record<string, string[]>) => void,
+	): Submission<Output> => {
+		const error = !result.success ? getError(result.error) : {};
+
+		updateState(error);
+
+		return createSubmission({
+			initialValue: flatten(context.data),
+			state: context.state,
+			pending: context.intent !== null,
+			value: result.success ? result.data : null,
+			error,
+		});
+	};
 
 	return options.async
-		? schema.safeParseAsync(data, { errorMap }).then((result) =>
-				createSubmission(result, {
-					intent,
-					state,
-					initialValue,
-				}),
-		  )
-		: createSubmission(schema.safeParse(data, { errorMap }), {
-				intent,
-				state,
-				initialValue,
-		  });
+		? schema
+				.safeParseAsync(form.data, { errorMap })
+				.then((result) => resolveSubmission(result, form, update))
+		: resolveSubmission(
+				schema.safeParse(form.data, { errorMap }),
+				form,
+				update,
+		  );
 }
 
 /**

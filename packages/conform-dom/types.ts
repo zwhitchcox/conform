@@ -98,7 +98,6 @@ export type Submission<Output, Input = Output> =
 	  }
 	| {
 			state: 'accepted';
-			intent: string | null;
 			value: Output;
 			report(options?: ReportOptions): SubmissionResult<Input>;
 	  };
