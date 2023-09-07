@@ -16,6 +16,8 @@ import {
 	validate,
 	isFieldElement,
 	resolveList,
+	getPaths,
+	formatPaths,
 } from '@conform-to/dom';
 import {
 	type RefObject,
@@ -43,7 +45,11 @@ export interface Form<Type>
 
 export interface Fieldset<Type> extends Omit<Field<Type>, 'name'> {
 	name: FieldName<Type> | undefined;
-	fields: { [Key in KeysOf<Type>]: Field<KeyType<Type, Key>> };
+	fields: Type extends Array<any>
+		? { [Key in keyof Type]: Field<Type[Key]> }
+		: Type extends { [key in string]?: any }
+		? { [Key in KeysOf<Type>]: Field<KeyType<Type, Key>> }
+		: never;
 }
 
 export interface FieldList<Item> extends Field<Item[]> {
@@ -308,15 +314,11 @@ export function useFieldset<Type>(config: {
 	return {
 		...field,
 		name: field.name !== '' ? field.name : undefined,
-		fields: new Proxy(
-			{} as { [Key in KeysOf<Type>]: Field<KeyType<Type, Key>> },
-			{
-				get(_target, key: unknown): Field<any> | undefined {
-					if (typeof key !== 'string') {
-						return;
-					}
-
-					const name = config.name ? `${config.name}.${key}` : key;
+		fields: new Proxy({} as any, {
+			get(_target, prop) {
+				const getFieldConfig = (key: string | number) => {
+					const paths = getPaths(config.name ?? '');
+					const name = formatPaths([...paths, key]);
 
 					return {
 						...generateIds(config.formId, name),
@@ -325,9 +327,26 @@ export function useFieldset<Type>(config: {
 						constraint: metadata.attributes.constraint[name] ?? {},
 						errors: metadata.error[name] ?? [],
 					};
-				},
+				};
+
+				// To support array destructuring
+				if (prop === Symbol.iterator) {
+					let index = 0;
+
+					return () => ({
+						next: () => ({ value: getFieldConfig(index++), done: false }),
+					});
+				}
+
+				const index = Number(prop);
+
+				if (typeof prop === 'string') {
+					return getFieldConfig(Number.isNaN(index) ? prop : index);
+				}
+
+				return;
 			},
-		),
+		}),
 	};
 }
 

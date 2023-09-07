@@ -24,4 +24,10 @@ export {
 	parseIntent,
 	updateList,
 } from './intent.js';
-export { formatPaths, setValue, resolveList, flatten } from './formdata.js';
+export {
+	getPaths,
+	formatPaths,
+	setValue,
+	resolveList,
+	flatten,
+} from './formdata.js';
