@@ -1,5 +1,3 @@
-import { invariant } from './util.js';
-
 /**
  * A ponyfill-like helper to get the form data with the submitter value.
  * It does not respect the tree order nor handles the image input.
@@ -97,36 +95,6 @@ export function setValue<Value>(
 
 	// @ts-expect-error: The pointer should be assigned with the result of the valueFn
 	return pointer;
-}
-
-export function resolveList(
-	defaultValue: Record<string, unknown>,
-	name: string,
-): Array<unknown> {
-	const data: { result?: Record<string, unknown> | Array<unknown> } = {};
-
-	for (const [key, value] of Object.entries(defaultValue)) {
-		if (!key.startsWith(name)) {
-			continue;
-		}
-
-		setValue(data, key.replace(name, 'result'), (prev) => {
-			if (!prev) {
-				return value;
-			} else if (Array.isArray(prev)) {
-				return prev.concat(value);
-			} else {
-				return [prev, value];
-			}
-		});
-	}
-
-	invariant(
-		typeof data.result === 'undefined' || Array.isArray(data.result),
-		'The defaultValue cannot be resolved to a list',
-	);
-
-	return data.result ?? [];
 }
 
 export function flatten(

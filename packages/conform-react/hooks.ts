@@ -5,6 +5,7 @@ import {
 	type Registry,
 	type FieldElement,
 	type FieldName,
+	type Primitive,
 	type SubmissionContext,
 	type SubmissionResult,
 	type Submission,
@@ -13,9 +14,7 @@ import {
 	createRegistry,
 	flatten,
 	requestIntent,
-	validate,
 	isFieldElement,
-	resolveList,
 	getPaths,
 	formatPaths,
 } from '@conform-to/dom';
@@ -33,7 +32,7 @@ import {
 	useLayoutEffect,
 	useCallback,
 } from 'react';
-
+import { validate } from './intent.js';
 export interface Form<Type>
 	extends Pick<
 		Fieldset<Type>,
@@ -254,7 +253,7 @@ export function useForm<
 						? shouldRevalidate === eventName
 						: shouldValidate === eventName
 				) {
-					requestIntent(form, validate(element.name));
+					requestIntent(form, validate({ name: element.name }));
 				}
 			});
 
@@ -350,6 +349,30 @@ export function useFieldset<Type>(config: {
 	};
 }
 
+/**
+ * Derives the default list keys based on the path
+ */
+function getDefaultListKeys(
+	defaultValue: Record<string, Primitive | Primitive[]>,
+	listName: string,
+): string[] {
+	let maxIndex = -1;
+
+	for (const name of Object.keys(defaultValue)) {
+		if (name.startsWith(listName)) {
+			const [index] = getPaths(name.slice(listName.length));
+
+			if (typeof index === 'number' && index > maxIndex) {
+				maxIndex = index;
+			}
+		}
+	}
+
+	return Array(maxIndex + 1)
+		.fill('')
+		.map((_, index) => `${index}]`);
+}
+
 export function useFieldList<Item>(config: {
 	formId: string;
 	name: FieldName<Item[]>;
@@ -364,8 +387,8 @@ export function useFieldList<Item>(config: {
 	});
 	const keys = useMemo(
 		() =>
-			metadata.state.listKeys?.[config.name] ??
-			Object.keys(resolveList(metadata.initialValue, config.name)),
+			metadata.state.listKeys[config.name] ??
+			getDefaultListKeys(metadata.initialValue, config.name),
 		[config.name, metadata.initialValue, metadata.state.listKeys],
 	);
 
@@ -402,7 +425,7 @@ export function useField<Type>(config: {
 	return {
 		...generateIds(config.formId, name),
 		name,
-		defaultValue: metadata.initialValue[name] as any,
+		defaultValue: metadata.initialValue[name] as Type | string | undefined,
 		constraint: metadata.attributes.constraint[name] ?? {},
 		errors: metadata.error[name] ?? [],
 	};

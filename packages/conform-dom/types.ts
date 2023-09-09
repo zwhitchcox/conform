@@ -31,9 +31,16 @@ export type Submitter = HTMLInputElement | HTMLButtonElement;
 
 export type Form = {
 	attributes: FormAttributes;
-	initialValue: Record<string, unknown>;
+	initialValue: Record<string, Primitive | Primitive[]>;
 	error: Record<string, string[]>;
 	state: FormState;
+};
+
+export type FormContext = {
+	intent: string | null;
+	state: FormState;
+	data: Record<string, unknown>;
+	fields: string[];
 };
 
 export type Entry = {
@@ -76,7 +83,7 @@ export type Constraint = {
 };
 
 export type FormAttributes = {
-	defaultValue: Record<string, unknown>;
+	defaultValue: Record<string, Primitive | Primitive[]>;
 	constraint: Record<string, Constraint>;
 };
 

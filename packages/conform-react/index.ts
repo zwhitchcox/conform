@@ -1,8 +1,6 @@
 export {
 	type Submission,
 	type FieldName,
-	list,
-	validate,
 	requestIntent,
 	isFieldElement,
 } from '@conform-to/dom';
@@ -16,3 +14,4 @@ export {
 	useInputEvent,
 } from './hooks.js';
 export * as conform from './helpers.js';
+export * as intent from './intent.js';

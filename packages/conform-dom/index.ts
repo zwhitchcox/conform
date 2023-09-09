@@ -1,4 +1,3 @@
-export { type Registry, createRegistry } from './registry.js';
 export {
 	type KeysOf,
 	type KeyType,
@@ -15,19 +14,17 @@ export {
 	type Primitive,
 	type DefaultValue,
 } from './types.js';
+export { type Registry, createRegistry } from './registry.js';
 export { isFieldElement } from './dom.js';
 export { invariant } from './util.js';
 export {
+	type ListIntentPayload,
+	INTENT,
 	list,
 	validate,
 	requestIntent,
-	parseIntent,
 	updateList,
+	getIntentHandler,
+	resolve,
 } from './intent.js';
-export {
-	getPaths,
-	formatPaths,
-	setValue,
-	resolveList,
-	flatten,
-} from './formdata.js';
+export { getPaths, formatPaths, setValue, flatten } from './formdata.js';

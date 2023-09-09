@@ -3,7 +3,7 @@ import {
 	conform,
 	useFieldList,
 	useForm,
-	list,
+	intent,
 } from '@conform-to/react';
 import { parse } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
@@ -65,19 +65,24 @@ export default function SimpleList() {
 							<div className="flex flex-row gap-2">
 								<button
 									className="rounded-md border p-2 hover:border-black"
-									{...list.remove(items.name, { index })}
+									{...intent.list(items, { operation: 'remove', index })}
 								>
 									Delete
 								</button>
 								<button
 									className="rounded-md border p-2 hover:border-black"
-									{...list.reorder(items.name, { from: index, to: 0 })}
+									{...intent.list(items, {
+										operation: 'reorder',
+										from: index,
+										to: 0,
+									})}
 								>
 									Move to top
 								</button>
 								<button
 									className="rounded-md border p-2 hover:border-black"
-									{...list.replace(items.name, {
+									{...intent.list(items, {
+										operation: 'replace',
 										index,
 										defaultValue: '',
 									})}
@@ -91,13 +96,13 @@ export default function SimpleList() {
 				<div className="flex flex-row gap-2">
 					<button
 						className="rounded-md border p-2 hover:border-black"
-						{...list.prepend(items.name, { defaultValue: '' })}
+						{...intent.list(items, { operation: 'prepend', defaultValue: '' })}
 					>
 						Insert top
 					</button>
 					<button
 						className="rounded-md border p-2 hover:border-black"
-						{...list.append(items.name, { defaultValue: '' })}
+						{...intent.list(items, { operation: 'append', defaultValue: '' })}
 					>
 						Insert bottom
 					</button>

@@ -1,5 +1,4 @@
-import { validate } from '@conform-to/dom';
-import { FormState, conform, useForm } from '@conform-to/react';
+import { FormState, conform, useForm, intent } from '@conform-to/react';
 import { parse } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
@@ -50,13 +49,13 @@ export default function Validate() {
 				<div className="flex flex-row gap-2">
 					<button
 						className="rounded-md border p-2 hover:border-black"
-						{...validate(form.fields.name.name)}
+						{...intent.validate(form.fields.name)}
 					>
 						Validate Name
 					</button>
 					<button
 						className="rounded-md border p-2 hover:border-black"
-						{...validate(form.fields.message.name)}
+						{...intent.validate(form.fields.message)}
 					>
 						Validate Message
 					</button>
