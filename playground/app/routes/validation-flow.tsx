@@ -44,7 +44,11 @@ export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
 	const submission = parse(formData, { schema });
 
-	return json(submission.report());
+	if (!submission.ready) {
+		return json(submission.reject());
+	}
+
+	return json(submission.accept());
 }
 
 export default function ValidationFlow() {

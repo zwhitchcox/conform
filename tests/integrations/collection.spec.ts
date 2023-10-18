@@ -17,55 +17,43 @@ async function runValidationScenario(page: Page) {
 	await playground.submit.click();
 
 	await expect(playground.error).toHaveText(['', '']);
-	await expect(playground.submission).toHaveText(
-		JSON.stringify(
-			{
-				initialValue: {
-					singleChoice: 'y',
-					multipleChoice: 'c',
-				},
-				error: {},
-				state: {
-					validated: {
-						singleChoice: true,
-						multipleChoice: true,
-					},
-					listKeys: {},
-				},
-				autoFocus: true,
+	await expect.poll(playground.result).toStrictEqual({
+		status: 'accepted',
+		initialValue: {
+			singleChoice: 'y',
+			multipleChoice: 'c',
+		},
+		error: {},
+		state: {
+			validated: {
+				singleChoice: true,
+				multipleChoice: true,
 			},
-			null,
-			2,
-		),
-	);
+			listKeys: {},
+		},
+	});
 
 	await playground.container.getByLabel('A').click();
 	await playground.submit.click();
 
 	await expect(playground.error).toHaveText(['', '']);
-	await expect(playground.submission).toHaveText(
-		JSON.stringify(
-			{
-				initialValue: {
-					singleChoice: 'y',
-					multipleChoice: ['a', 'c'],
-					'multipleChoice[0]': 'a',
-					'multipleChoice[1]': 'c',
-				},
-				error: {},
-				state: {
-					validated: {
-						singleChoice: true,
-						multipleChoice: true,
-					},
-					listKeys: {},
-				},
-				autoFocus: true,
+	await expect.poll(playground.result).toStrictEqual({
+		status: 'accepted',
+		initialValue: {
+			singleChoice: 'y',
+			multipleChoice: ['a', 'c'],
+			'multipleChoice[0]': 'a',
+			'multipleChoice[1]': 'c',
+		},
+		error: {},
+		state: {
+			validated: {
+				singleChoice: true,
+				multipleChoice: true,
 			},
-			null,
-			2,
-		),
-	);
+			listKeys: {},
+		},
+	});
 }
 
 test.describe('With JS', () => {

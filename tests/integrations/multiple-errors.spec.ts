@@ -53,25 +53,19 @@ async function runValidationScenario(page: Page) {
 	await username.type('2023');
 	await playground.submit.click();
 	await expect(playground.error).toHaveText(['']);
-	await expect(playground.submission).toHaveText(
-		JSON.stringify(
-			{
-				initialValue: {
-					username: '@Conform2023',
-				},
-				error: {},
-				state: {
-					validated: {
-						username: true,
-					},
-					listKeys: {},
-				},
-				autoFocus: true,
+	await expect.poll(playground.result).toStrictEqual({
+		status: 'accepted',
+		initialValue: {
+			username: '@Conform2023',
+		},
+		error: {},
+		state: {
+			validated: {
+				username: true,
 			},
-			null,
-			2,
-		),
-	);
+			listKeys: {},
+		},
+	});
 }
 
 test.describe.skip('Custom Validation', () => {

@@ -10,7 +10,7 @@ export type Intent<Payload = unknown> = {
 	createHandler(
 		data: Record<string, unknown>,
 		payload: Payload,
-	): (result: SubmissionResult) => void;
+	): (result: Omit<Required<SubmissionResult>, 'status'>) => void;
 };
 
 export const INTENT = '__intent__';
@@ -79,13 +79,19 @@ export function resolve(payload: FormData | URLSearchParams): FormContext {
 
 export function createIntent(options: {
 	type: string;
-	update: (result: SubmissionResult, payload: string) => void;
+	update: (
+		result: Omit<Required<SubmissionResult>, 'status'>,
+		payload: string,
+	) => void;
 }): Intent<string>;
 export function createIntent<Payload>(options: {
 	type: string;
 	serialize: (payload: Payload) => string;
 	deserialize: (serializedPayload: string) => Payload;
-	update: (result: SubmissionResult, payload: Payload) => void;
+	update: (
+		result: Omit<Required<SubmissionResult>, 'status'>,
+		payload: Payload,
+	) => void;
 }): Intent<Payload>;
 export function createIntent<Payload, Context>(options: {
 	type: string;
@@ -93,7 +99,7 @@ export function createIntent<Payload, Context>(options: {
 	deserialize: (serializedPayload: string) => Payload;
 	preprocess: (data: Record<string, unknown>, payload: Payload) => Context;
 	update: (
-		result: SubmissionResult,
+		result: Omit<Required<SubmissionResult>, 'status'>,
 		payload: Payload,
 		context: Context,
 	) => void;
@@ -104,17 +110,17 @@ export function createIntent<Payload, Context>(options: {
 	deserialize?: (serializedPayload: string) => Payload;
 	preprocess?: (data: Record<string, unknown>, payload: Payload) => Context;
 	update: (
-		result: SubmissionResult,
+		result: Omit<Required<SubmissionResult>, 'status'>,
 		payload: Payload,
 		context: Context | undefined,
 	) => void;
 }): Intent<Payload> {
 	return {
 		type: options.type,
-		serialize(payload: Payload): string {
+		serialize(payload) {
 			return `${options.type}/${options.serialize?.(payload) ?? payload}`;
 		},
-		deserialize(serializedIntent: string): Payload | null {
+		deserialize(serializedIntent) {
 			const seperatorIndex = serializedIntent.indexOf('/');
 
 			if (seperatorIndex > -1) {
@@ -131,7 +137,7 @@ export function createIntent<Payload, Context>(options: {
 
 			return null;
 		},
-		createHandler(data: Record<string, unknown>, payload: Payload) {
+		createHandler(data, payload) {
 			const context = options.preprocess?.(data, payload);
 
 			return (result) => {
@@ -250,7 +256,7 @@ export function requestIntent(
 export function getIntentHandler(
 	form: FormContext,
 	intents: Array<Intent> = [validate, list],
-): (result: SubmissionResult) => void {
+): (result: Omit<Required<SubmissionResult>, 'status'>) => void {
 	if (form.intent) {
 		for (const intent of intents) {
 			const payload = intent.deserialize(form.intent);

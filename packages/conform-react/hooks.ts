@@ -190,7 +190,7 @@ export function useForm<
 		form,
 		submitter,
 		formData,
-	}: SubmissionContext) => Submission<any, Type>;
+	}: SubmissionContext) => Submission<any>;
 }): Form<Type> {
 	const formId = useFormId(config.id);
 	const registry = useRegistry();

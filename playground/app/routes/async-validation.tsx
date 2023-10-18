@@ -57,7 +57,11 @@ export async function action({ request }: ActionArgs) {
 		async: true,
 	});
 
-	return json(submission.report());
+	if (!submission.ready) {
+		return json(submission.reject());
+	}
+
+	return json(submission.accept());
 }
 
 export default function EmployeeForm() {

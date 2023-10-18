@@ -10,7 +10,6 @@ export {
 	type SubmissionContext,
 	type Submission,
 	type SubmissionResult,
-	type ReportOptions,
 	type Primitive,
 	type DefaultValue,
 } from './types.js';

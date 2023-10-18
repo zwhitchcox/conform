@@ -34,22 +34,6 @@ export function createRegistry() {
 		return element;
 	}
 
-	function shouldPreventDefault(submission: Submission<unknown>): boolean {
-		if (submission.state === 'accepted') {
-			return false;
-		}
-
-		const result = submission.report();
-
-		for (const messages of Object.values(result.error)) {
-			if (messages.includes('__VALIDATION_UNDEFINED__')) {
-				return false;
-			}
-		}
-
-		return true;
-	}
-
 	return {
 		register(
 			formId: string,
@@ -118,14 +102,19 @@ export function createRegistry() {
 								submitter,
 							});
 
-							if (
-								// !submitter?.formNoValidate &&
-								shouldPreventDefault(submission)
-							) {
-								const result = submission.report();
+							if (!submission.ready) {
+								const result = submission.reject();
 
-								this.update(result);
-								event.preventDefault();
+								if (
+									result.error &&
+									Object.values(result.error).every(
+										(messages) =>
+											!messages.includes('__VALIDATION_UNDEFINED__'),
+									)
+								) {
+									this.update(result);
+									event.preventDefault();
+								}
 							}
 
 							return {
@@ -144,7 +133,7 @@ export function createRegistry() {
 					const entry = getEntry(formId);
 					const formElement = getFormElement(formId);
 
-					if (result.initialValue === null) {
+					if (typeof result.initialValue === 'undefined') {
 						formElement.reset();
 						return;
 					}
@@ -157,7 +146,7 @@ export function createRegistry() {
 						...result.error,
 					})) {
 						const prev = entry.form.error[name] ?? [];
-						const next = result.error[name] ?? [];
+						const next = result.error?.[name] ?? [];
 
 						if (
 							!next.includes('__VALIDATION_SKIPPED__') &&
@@ -167,7 +156,9 @@ export function createRegistry() {
 						}
 					}
 
-					for (const [name, value] of Object.entries(result.state.validated)) {
+					for (const [name, value] of Object.entries(
+						result.state?.validated ?? {},
+					)) {
 						const prev = entry.form.state.validated[name];
 						const next = value;
 
@@ -176,7 +167,9 @@ export function createRegistry() {
 						}
 					}
 
-					for (const [name, value] of Object.entries(result.state.listKeys)) {
+					for (const [name, value] of Object.entries(
+						result.state?.listKeys ?? {},
+					)) {
 						const prev = entry.form.state.listKeys[name];
 						const next = value;
 
@@ -190,8 +183,11 @@ export function createRegistry() {
 						form: {
 							...entry.form,
 							initialValue: result.initialValue,
-							error: result.error,
-							state: result.state,
+							error: result.error ?? {},
+							state: result.state ?? {
+								validated: {},
+								listKeys: {},
+							},
 						},
 					});
 
@@ -222,7 +218,7 @@ export function createRegistry() {
 						}
 					}
 
-					if (result.autoFocus) {
+					if (result.status === 'failed') {
 						// Update focus
 						focusFirstInvalidField(formElement);
 					}

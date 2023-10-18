@@ -114,27 +114,21 @@ async function runValidationScenario(page: Page) {
 
 	await expect(playground.error).toHaveText(['', '']);
 
-	await expect(playground.submission).toHaveText(
-		JSON.stringify(
-			{
-				initialValue: {
-					email: 'hey@conform.guide',
-					title: 'Software Developer',
-				},
-				error: {},
-				state: {
-					validated: {
-						email: true,
-						title: true,
-					},
-					listKeys: {},
-				},
-				autoFocus: true,
+	await expect.poll(playground.result).toStrictEqual({
+		status: 'accepted',
+		initialValue: {
+			email: 'hey@conform.guide',
+			title: 'Software Developer',
+		},
+		error: {},
+		state: {
+			validated: {
+				email: true,
+				title: true,
 			},
-			null,
-			2,
-		),
-	);
+			listKeys: {},
+		},
+	});
 }
 
 test.describe('With JS', () => {

@@ -2,7 +2,6 @@ import {
 	type FormState,
 	type Submission,
 	type SubmissionResult,
-	type ReportOptions,
 	flatten,
 	formatPaths,
 	resolve,
@@ -11,7 +10,6 @@ import {
 import {
 	type IssueData,
 	type SafeParseReturnType,
-	type input,
 	type output,
 	type RefinementCtx,
 	type ZodTypeAny,
@@ -34,79 +32,92 @@ function getError({ errors }: ZodError): Record<string, string[]> {
 	}, {});
 }
 
-function report(
-	result: SubmissionResult,
-	options?: ReportOptions,
-): SubmissionResult {
-	if (options?.resetForm) {
-		return {
-			initialValue: null,
-			error: {},
-			state: {
-				validated: {},
-				listKeys: {},
-			},
-			autoFocus: false,
-		};
-	}
-
-	return result;
-}
-
 interface SubmissionContext<Value> {
-	initialValue: Record<string, string | string[]> | null;
+	initialValue: Record<string, string | string[]>;
 	value: Value | null;
 	error: Record<string, string[]>;
 	state: FormState;
 	pending: boolean;
 }
 
-function createSubmission<Value>(
-	context: SubmissionContext<Value>,
-	update: (result: SubmissionResult) => void,
-): Submission<Value> {
-	const result: SubmissionResult = {
-		initialValue: context.initialValue,
-		error: context.error,
-		state: context.state,
-		autoFocus: !context.pending,
-	};
+function constructError(
+	formErrors: string[] = [],
+	fieldErrors: Record<string, string[]> = {},
+) {
+	const error = fieldErrors;
 
-	update(result);
-
-	if (context.pending) {
-		result.error = Object.entries(context.error).reduce<
-			Record<string, string[]>
-		>((result, [name, messages]) => {
-			if (context.state.validated[name]) {
-				result[name] = messages;
-			}
-
-			return result;
-		}, {});
-
-		return {
-			state: 'pending',
-			report(options) {
-				return report(result, options);
-			},
-		};
+	if (formErrors.length > 0) {
+		error[''] = formErrors;
 	}
 
+	return error;
+}
+
+function createSubmission<Value>(
+	context: SubmissionContext<Value>,
+): Submission<Value> {
 	if (!context.value) {
 		return {
-			state: 'rejected',
-			report(options) {
-				return report(result, options);
+			ready: false,
+			pending: context.pending,
+			payload: context.initialValue,
+			error: context.error,
+			reject(options) {
+				const error = Object.entries(context.error).reduce<
+					Record<string, string[]>
+				>((result, [name, messages]) => {
+					if (messages.length > 0 && context.state.validated[name]) {
+						result[name] = (result[name] ?? []).concat(messages);
+					}
+
+					return result;
+				}, constructError(options?.formErrors, options?.fieldErrors));
+
+				return {
+					status: context.pending ? 'updated' : 'failed',
+					initialValue: context.initialValue,
+					error,
+					state: context.state,
+				};
+			},
+			accept(options) {
+				if (options?.resetForm) {
+					return { status: 'accepted' };
+				}
+
+				return {
+					status: 'accepted',
+					initialValue: context.initialValue,
+					error: context.error,
+					state: context.state,
+				};
 			},
 		};
 	}
 
 	return {
-		state: 'accepted',
+		ready: true,
+		payload: context.initialValue,
 		value: context.value,
-		report(options) {
-			return report(result, options);
+		reject(options) {
+			return {
+				status: 'failed',
+				initialValue: context.initialValue,
+				error: constructError(options.formErrors, options.fieldErrors),
+				state: context.state,
+			};
+		},
+		accept(options) {
+			if (options?.resetForm) {
+				return { status: 'accepted' };
+			}
+
+			return {
+				status: 'accepted',
+				initialValue: context.initialValue,
+				error: context.error,
+				state: context.state,
+			};
 		},
 	};
 }
@@ -118,7 +129,7 @@ export function parse<Schema extends ZodTypeAny>(
 		async?: false;
 		errorMap?: ZodErrorMap;
 	},
-): Submission<output<Schema>, input<Schema>>;
+): Submission<output<Schema>>;
 export function parse<Schema extends ZodTypeAny>(
 	payload: FormData | URLSearchParams,
 	options: {
@@ -126,7 +137,7 @@ export function parse<Schema extends ZodTypeAny>(
 		async: true;
 		errorMap?: ZodErrorMap;
 	},
-): Promise<Submission<output<Schema>, input<Schema>>>;
+): Promise<Submission<output<Schema>>>;
 export function parse<Schema extends ZodTypeAny>(
 	payload: FormData | URLSearchParams,
 	options: {
@@ -134,9 +145,7 @@ export function parse<Schema extends ZodTypeAny>(
 		async?: boolean;
 		errorMap?: ZodErrorMap;
 	},
-):
-	| Submission<output<Schema>, input<Schema>>
-	| Promise<Submission<output<Schema>, input<Schema>>> {
+): Submission<output<Schema>> | Promise<Submission<output<Schema>>> {
 	const form = resolve(payload);
 	const update = getIntentHandler(form);
 	const errorMap = options.errorMap;
@@ -153,20 +162,25 @@ export function parse<Schema extends ZodTypeAny>(
 			data: Record<string, unknown>;
 			fields: string[];
 		},
-		updateState: (result: SubmissionResult) => void,
+		updateState: (result: Omit<Required<SubmissionResult>, 'status'>) => void,
 	): Submission<Output> => {
 		const error = !result.success ? getError(result.error) : {};
+		const initialValue = flatten(context.data);
+		const state = context.state;
 
-		return createSubmission(
-			{
-				initialValue: flatten(context.data),
-				state: context.state,
-				pending: context.intent !== null,
-				value: result.success ? result.data : null,
-				error,
-			},
-			updateState,
-		);
+		updateState({
+			initialValue,
+			error,
+			state,
+		});
+
+		return createSubmission({
+			initialValue,
+			state,
+			pending: context.intent !== null,
+			value: result.success ? result.data : null,
+			error,
+		});
 	};
 
 	return options.async

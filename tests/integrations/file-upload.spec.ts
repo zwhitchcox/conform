@@ -80,7 +80,8 @@ async function runValidationScenario(page: Page) {
 	await playground.submit.click();
 	await expect(playground.error).toHaveText(['', '', '']);
 
-	expect(JSON.parse(await playground.submission.innerText())).toEqual({
+	await expect.poll(playground.result).toStrictEqual({
+		status: 'accepted',
 		initialValue: {},
 		error: {},
 		state: {
@@ -90,7 +91,6 @@ async function runValidationScenario(page: Page) {
 			},
 			listKeys: {},
 		},
-		autoFocus: true,
 	});
 }
 

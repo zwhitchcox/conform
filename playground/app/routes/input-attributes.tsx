@@ -24,7 +24,7 @@ export async function loader({ request }: LoaderArgs) {
 
 export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
-	const payload: Record<string, string | string[]> = {};
+	const initialValue: Record<string, string | string[]> = {};
 	const error: Record<string, string[]> = {};
 	const validated: Record<string, boolean> = {};
 
@@ -43,20 +43,23 @@ export async function action({ request }: ActionArgs) {
 		error[name] = ['invalid'];
 
 		for (const next of values) {
-			const prev = payload[name];
+			const prev = initialValue[name];
 
 			if (typeof next === 'string') {
 				if (typeof prev === 'undefined') {
-					payload[name] = next;
+					initialValue[name] = next;
 				} else {
-					payload[name] = Array.isArray(prev) ? [...prev, next] : [prev, next];
+					initialValue[name] = Array.isArray(prev)
+						? [...prev, next]
+						: [prev, next];
 				}
 			}
 		}
 	}
 
 	return json<SubmissionResult>({
-		payload,
+		status: 'failed',
+		initialValue,
 		error: {
 			...error,
 			'': ['invalid'],
