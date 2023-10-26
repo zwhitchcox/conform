@@ -5,7 +5,7 @@ export {
 	isFieldElement,
 } from '@conform-to/dom';
 export {
-	ConformBoundary,
+	FormProvider,
 	FormState,
 	useForm,
 	useFieldset,

@@ -1,4 +1,3 @@
-import { ConformBoundary } from '@conform-to/react';
 import type { V2_MetaFunction, LinksFunction } from '@remix-run/node';
 import {
 	Links,
@@ -30,9 +29,7 @@ export default function App() {
 				<Links />
 			</head>
 			<body className="antialiased font-sans bg-gray-100 max-w-7xl mx-auto py-10 lg:px-8">
-				<ConformBoundary>
-					<Outlet />
-				</ConformBoundary>
+				<Outlet />
 				<ScrollRestoration />
 				<Scripts />
 				<LiveReload />

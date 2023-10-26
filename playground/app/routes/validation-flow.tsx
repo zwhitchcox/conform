@@ -70,7 +70,7 @@ export default function ValidationFlow() {
 
 	return (
 		<Form method="post" {...conform.form(form)}>
-			<FormState formId={form.id} />
+			<FormState formId={form.id} context={form.context} />
 			<Playground title="Validation Flow" lastSubmission={lastResult}>
 				<Field label="Email" config={form.fields.email}>
 					<input {...conform.input(form.fields.email, { type: 'email' })} />

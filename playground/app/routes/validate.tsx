@@ -42,7 +42,7 @@ export default function Validate() {
 
 	return (
 		<Form method="post" {...conform.form(form)}>
-			<FormState formId={form.id} />
+			<FormState formId={form.id} context={form.context} />
 			<Playground title="Validate" lastSubmission={lastResult}>
 				<Field label="Name" config={form.fields.name}>
 					<input {...conform.input(form.fields.name, { type: 'text' })} />

@@ -79,7 +79,7 @@ export default function EmployeeForm() {
 
 	return (
 		<Form method="post" {...conform.form(form)}>
-			<FormState formId={form.id} />
+			<FormState formId={form.id} context={form.context} />
 			<Playground title="Employee Form" lastSubmission={lastResult}>
 				<Field label="Email" config={form.fields.email}>
 					<input

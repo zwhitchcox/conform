@@ -72,7 +72,7 @@ export default function ExampleForm() {
 
 	return (
 		<Form method="post" {...conform.form(form)}>
-			<FormState formId={form.id} />
+			<FormState formId={form.id} context={form.context} />
 			<Playground
 				title="Payment Form"
 				description={

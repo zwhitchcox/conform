@@ -2,7 +2,6 @@ import {
 	type KeysOf,
 	type KeyType,
 	type Constraint,
-	type Registry,
 	type FieldElement,
 	type FieldName,
 	type Primitive,
@@ -11,33 +10,36 @@ import {
 	type Submission,
 	type DefaultValue,
 	type Form as FormMetadata,
-	createRegistry,
 	flatten,
 	requestIntent,
 	isFieldElement,
 	getPaths,
 	formatPaths,
+	createForm,
 } from '@conform-to/dom';
 import {
 	type RefObject,
+	type ReactNode,
 	createContext,
 	createElement,
-	useContext,
+	startTransition,
 	useEffect,
 	useId,
 	useMemo,
 	useRef,
 	useState,
-	useSyncExternalStore,
 	useLayoutEffect,
 	useCallback,
+	useContext,
 } from 'react';
 import { validate } from './intent.js';
+
 export interface Form<Type>
 	extends Pick<
 		Fieldset<Type>,
 		'id' | 'descriptionId' | 'errorId' | 'errors' | 'fields'
 	> {
+	context: FormMetadata;
 	onSubmit: (event: React.FormEvent<HTMLFormElement>) => any;
 	noValidate: boolean;
 }
@@ -58,6 +60,7 @@ export interface FieldList<Item> extends Field<Item[]> {
 export interface Field<Type> {
 	id: string;
 	formId: string;
+	context: FormMetadata;
 	errorId: string;
 	descriptionId: string;
 	name: FieldName<Type>;
@@ -66,10 +69,37 @@ export interface Field<Type> {
 	errors: string[];
 }
 
-const RegistryContext = createContext(createRegistry());
+const FormContext = createContext<Record<string, FormMetadata>>({});
 
-export function useRegistry(): Registry {
-	return useContext(RegistryContext);
+export function useFormContext(
+	formId: string,
+	localContext?: FormMetadata,
+): FormMetadata {
+	const context = useContext(FormContext);
+	const result = localContext ?? context[formId];
+
+	if (!result) {
+		throw new Error('Form context is not available');
+	}
+
+	return result;
+}
+
+export function FormProvider(props: {
+	formId: string;
+	context: FormMetadata;
+	children: ReactNode;
+}) {
+	const context = useContext(FormContext);
+	const value = useMemo(
+		() => ({ ...context, [props.formId]: props.context }),
+		[context, props.formId, props.context],
+	);
+
+	return createElement(FormContext.Provider, {
+		value,
+		children: props.children,
+	});
 }
 
 export function useFormId(preferredId?: string) {
@@ -88,81 +118,22 @@ export function useNoValidate(defaultNoValidate = true): boolean {
 	return noValidate;
 }
 
-export function FormState({ formId }: { formId: string }): React.ReactElement {
-	const form = useFormSubscription({ formId });
+export function FormState(props: {
+	formId: string;
+	context: FormMetadata;
+}): React.ReactElement {
+	const context = useFormContext(props.formId, props.context);
 
 	return createElement(
 		'fieldset',
-		{ form: formId, hidden: true },
+		{ form: props.formId, hidden: true },
 		createElement('input', {
 			type: 'hidden',
-			form: formId,
+			form: props.formId,
 			name: '__state__',
-			value: JSON.stringify(form.state),
+			value: JSON.stringify(context.state),
 		}),
 	);
-}
-
-export function ConformBoundary(props: {
-	children: React.ReactNode;
-}): React.ReactElement {
-	const [registry] = useState(() => createRegistry());
-
-	return createElement(
-		RegistryContext.Provider,
-		{ value: registry },
-		props.children,
-	);
-}
-
-export function useFormSubscription(config: {
-	formId: string;
-	name?: string;
-	state?: {
-		error?: boolean;
-		list?: boolean;
-		validated?: boolean;
-	};
-}): FormMetadata {
-	const registry = useRegistry();
-	const store = useMemo(
-		() => ({
-			subscribe: (callback: () => void) =>
-				registry.subscribe(config.formId, callback, (update) => {
-					if (
-						typeof config.name !== 'undefined' &&
-						update.name !== config.name
-					) {
-						return false;
-					}
-
-					const state = {
-						error: config.state?.error,
-						validated: config.state?.validated,
-						list: config.state?.list,
-					};
-
-					return state?.[update.type] ?? false;
-				}),
-			getState: () => registry.getForm(config.formId),
-		}),
-		[
-			registry,
-			config.formId,
-			config.name,
-			config.state?.error,
-			config.state?.list,
-			config.state?.validated,
-		],
-	);
-	const state = useSyncExternalStore(
-		store.subscribe,
-		store.getState,
-		// Uses the same snapshot for server rendering / hydration.
-		store.getState,
-	);
-
-	return state;
 }
 
 export function generateIds(formId: string, name: string) {
@@ -173,6 +144,28 @@ export function generateIds(formId: string, name: string) {
 		formId,
 		errorId: `${id}-error`,
 		descriptionId: `${id}-description`,
+	};
+}
+
+export function getName(key: string | number, prefix?: string) {
+	const paths = getPaths(prefix ?? '');
+	const name = formatPaths([...paths, key]);
+
+	return name;
+}
+
+export function getFieldConfig(
+	formId: string,
+	name: string,
+	context: FormMetadata,
+) {
+	return {
+		...generateIds(formId, name),
+		context,
+		name,
+		defaultValue: context.initialValue[name],
+		constraint: context.attributes.constraint[name] ?? {},
+		errors: context.error[name] ?? [],
 	};
 }
 
@@ -193,9 +186,8 @@ export function useForm<
 	}: SubmissionContext) => Submission<any>;
 }): Form<Type> {
 	const formId = useFormId(config.id);
-	const registry = useRegistry();
-	const registerForm = () =>
-		registry.register(
+	const initializeForm = () =>
+		createForm(
 			formId,
 			{
 				defaultValue: flatten(config.defaultValue ?? {}),
@@ -203,20 +195,26 @@ export function useForm<
 			},
 			config.lastResult,
 		);
-	const [form, setForm] = useState(registerForm);
+	const [form, setForm] = useState(initializeForm);
 
 	// If id changes, reinitialize the form immediately
 	if (formId !== form.id) {
-		setForm(registerForm);
+		setForm(initializeForm);
 	}
 
-	useEffect(() => form.initialize(), [form]);
-
+	const [context, setContext] = useState(form.context);
 	const noValidate = useNoValidate(config.defaultNoValidate);
 	const configRef = useRef(config);
 	const { errorId, descriptionId, fields, errors } = useFieldset<Type>({
 		formId,
+		context,
 	});
+
+	useEffect(
+		() =>
+			form.subscribe((context) => startTransition(() => setContext(context))),
+		[form],
+	);
 
 	useEffect(() => {
 		// Report only if the submission has changed
@@ -288,6 +286,7 @@ export function useForm<
 
 	return {
 		id: formId,
+		context,
 		errorId,
 		descriptionId,
 		onSubmit,
@@ -300,32 +299,25 @@ export function useForm<
 export function useFieldset<Type>(config: {
 	formId: string;
 	name?: FieldName<Type>;
+	context?: FormMetadata;
 }): Fieldset<Type> {
-	const field = useField({ formId: config.formId, name: config.name ?? '' });
-	const metadata = useFormSubscription({
+	const field = useField({
 		formId: config.formId,
-		name: config.name,
-		state: {
-			error: true,
-		},
+		name: config.name ?? '',
+		context: config.context,
 	});
+	const metadata = useFormContext(config.formId, config.context);
 
 	return {
 		...field,
 		name: field.name !== '' ? field.name : undefined,
 		fields: new Proxy({} as any, {
 			get(_target, prop) {
-				const getFieldConfig = (key: string | number) => {
-					const paths = getPaths(config.name ?? '');
-					const name = formatPaths([...paths, key]);
+				const getField = (key: string | number) => {
+					const name = getName(key, config.name);
+					const field = getFieldConfig(config.formId, name, metadata);
 
-					return {
-						...generateIds(config.formId, name),
-						name,
-						defaultValue: metadata.initialValue[name],
-						constraint: metadata.attributes.constraint[name] ?? {},
-						errors: metadata.error[name] ?? [],
-					};
+					return field;
 				};
 
 				// To support array destructuring
@@ -333,14 +325,14 @@ export function useFieldset<Type>(config: {
 					let index = 0;
 
 					return () => ({
-						next: () => ({ value: getFieldConfig(index++), done: false }),
+						next: () => ({ value: getField(index++), done: false }),
 					});
 				}
 
 				const index = Number(prop);
 
 				if (typeof prop === 'string') {
-					return getFieldConfig(Number.isNaN(index) ? prop : index);
+					return getField(Number.isNaN(index) ? prop : index);
 				}
 
 				return;
@@ -376,15 +368,10 @@ function getDefaultListKeys(
 export function useFieldList<Item>(config: {
 	formId: string;
 	name: FieldName<Item[]>;
+	context?: FormMetadata;
 }): FieldList<Item> {
 	const field = useField(config);
-	const metadata = useFormSubscription({
-		...config,
-		state: {
-			error: true,
-			list: true,
-		},
-	});
+	const metadata = useFormContext(config.formId, config.context);
 	const keys = useMemo(
 		() =>
 			metadata.state.listKeys[config.name] ??
@@ -395,15 +382,13 @@ export function useFieldList<Item>(config: {
 	return {
 		...field,
 		list: keys.map((key, index) => {
-			const name = `${config.name}[${index}]`;
+			const name = getName(index, config.name);
+			const field = getFieldConfig(config.formId, name, metadata);
 
 			return {
-				...generateIds(config.formId, name),
+				...field,
 				key,
-				name,
-				defaultValue: metadata.initialValue[name] as Item | string | undefined,
-				constraint: metadata.attributes.constraint[name] ?? {},
-				errors: metadata.error[name] ?? [],
+				defaultValue: field.defaultValue as Item | string | undefined,
 			};
 		}),
 	};
@@ -412,22 +397,15 @@ export function useFieldList<Item>(config: {
 export function useField<Type>(config: {
 	formId: string;
 	name: FieldName<Type>;
+	context?: FormMetadata;
 }): Field<Type> {
-	const metadata = useFormSubscription({
-		formId: config.formId,
-		name: config.name,
-		state: {
-			error: true,
-		},
-	});
+	const metadata = useFormContext(config.formId, config.context);
 	const name = config.name;
+	const field = getFieldConfig(config.formId, name, metadata);
 
 	return {
-		...generateIds(config.formId, name),
-		name,
-		defaultValue: metadata.initialValue[name] as Type | string | undefined,
-		constraint: metadata.attributes.constraint[name] ?? {},
-		errors: metadata.error[name] ?? [],
+		...field,
+		defaultValue: field.defaultValue as Type | string | undefined,
 	};
 }
 

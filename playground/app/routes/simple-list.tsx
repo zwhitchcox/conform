@@ -57,7 +57,7 @@ export default function SimpleList() {
 
 	return (
 		<Form method="post" {...conform.form(form)}>
-			<FormState formId={form.id} />
+			<FormState formId={form.id} context={form.context} />
 			<Playground title="Simple list" lastSubmission={lastResult}>
 				<Alert errors={items.errors} />
 				<ol>

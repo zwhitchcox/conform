@@ -43,7 +43,7 @@ export default function Example() {
 
 	return (
 		<Form method="post" {...conform.form(form)}>
-			<FormState formId={form.id} />
+			<FormState formId={form.id} context={form.context} />
 			<Playground title="Collection" lastSubmission={lastResult}>
 				<Field label="Single choice" config={form.fields.singleChoice}>
 					{conform
