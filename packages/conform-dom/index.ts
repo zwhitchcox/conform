@@ -3,7 +3,7 @@ export {
 	type KeyType,
 	type Constraint,
 	type Form,
-	type FormAttributes,
+	type FormMetadata as FormAttributes,
 	type FormState,
 	type FieldName,
 	type FieldElement,

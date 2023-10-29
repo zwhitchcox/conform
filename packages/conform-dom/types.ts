@@ -30,7 +30,7 @@ export type FormControl = FieldElement | HTMLButtonElement;
 export type Submitter = HTMLInputElement | HTMLButtonElement;
 
 export type Form = {
-	attributes: FormAttributes;
+	metadata: FormMetadata;
 	initialValue: Record<string, Primitive | Primitive[]>;
 	error: Record<string, string[]>;
 	state: FormState;
@@ -43,34 +43,6 @@ export type FormContext = {
 	fields: string[];
 };
 
-export type Entry = {
-	form: Form;
-	subscribers: Array<{
-		shouldNotify: (update: Update) => boolean;
-		callback: () => void;
-	}>;
-};
-
-export type Update =
-	| {
-			type: 'error';
-			name: string;
-			prev?: string[];
-			next: string[];
-	  }
-	| {
-			type: 'list';
-			name: string;
-			prev?: Array<string>;
-			next: Array<string>;
-	  }
-	| {
-			type: 'validated';
-			name: string;
-			prev?: boolean;
-			next: boolean;
-	  };
-
 export type Constraint = {
 	required?: boolean;
 	minLength?: number;
@@ -82,7 +54,7 @@ export type Constraint = {
 	pattern?: string;
 };
 
-export type FormAttributes = {
+export type FormMetadata = {
 	defaultValue: Record<string, Primitive | Primitive[]>;
 	constraint: Record<string, Constraint>;
 };

@@ -7,7 +7,7 @@ import {
 	focusFirstInvalidField,
 } from './dom.js';
 import type {
-	FormAttributes,
+	FormMetadata,
 	FieldElement,
 	Submission,
 	SubmissionContext,
@@ -19,13 +19,13 @@ export type Form = ReturnType<typeof createForm>;
 
 export function createForm(
 	formId: string,
-	attributes: FormAttributes,
+	metadata: FormMetadata,
 	lastResult?: SubmissionResult,
 ) {
 	let listeners: Array<(context: any) => void> = [];
 	let context = {
-		attributes,
-		initialValue: lastResult?.initialValue ?? attributes.defaultValue,
+		metadata,
+		initialValue: lastResult?.initialValue ?? metadata.defaultValue,
 		error: lastResult?.error ?? {},
 		state: lastResult?.state ?? {
 			validated: {},
@@ -174,7 +174,7 @@ export function createForm(
 				validated: context.state.validated?.[element.name] ?? false,
 			});
 		},
-		reset(event: Event, updatedAttributes?: FormAttributes) {
+		reset(event: Event, newMetadata?: FormMetadata) {
 			const element = getFormElement(formId);
 
 			if (
@@ -185,11 +185,11 @@ export function createForm(
 				return;
 			}
 
-			const attributes = updatedAttributes ?? context.attributes;
+			const metadata = newMetadata ?? context.metadata;
 
 			updateContext({
-				attributes,
-				initialValue: attributes.defaultValue,
+				metadata,
+				initialValue: metadata.defaultValue,
 				error: {},
 				state: {
 					validated: {},

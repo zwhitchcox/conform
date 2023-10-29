@@ -1,4 +1,9 @@
-import { FormState, conform, useForm, useInputEvent } from '@conform-to/react';
+import {
+	ConformBoundary,
+	conform,
+	useForm,
+	useInputEvent,
+} from '@conform-to/react';
 import { parse } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
@@ -48,26 +53,27 @@ export default function Example() {
 	});
 
 	return (
-		<Form method="post" {...conform.form(form.config)}>
-			<FormState formId={form.id} context={form.context} />
-			<Playground title="Custom Inputs Form" lastSubmission={lastResult}>
-				<Field label="Headless ListBox" config={form.fields.language}>
-					<CustomSelect
-						id={form.fields.language.id}
-						name={form.fields.language.name}
-						defaultValue={form.fields.language.defaultValue}
-					/>
-				</Field>
-				<Field label="Radix Checkbox" config={form.fields.tos}>
-					<CustomCheckbox
-						id={form.fields.tos.id}
-						name={form.fields.tos.name}
-						defaultChecked={form.fields.tos.defaultValue === 'on'}
-						label="I accept the terms of service"
-					/>
-				</Field>
-			</Playground>
-		</Form>
+		<ConformBoundary formId={form.config.id} context={form.context}>
+			<Form method="post" {...conform.form(form.config)}>
+				<Playground title="Custom Inputs Form" lastSubmission={lastResult}>
+					<Field label="Headless ListBox" config={form.fields.language}>
+						<CustomSelect
+							id={form.fields.language.id}
+							name={form.fields.language.name}
+							defaultValue={form.fields.language.defaultValue}
+						/>
+					</Field>
+					<Field label="Radix Checkbox" config={form.fields.tos}>
+						<CustomCheckbox
+							id={form.fields.tos.id}
+							name={form.fields.tos.name}
+							defaultChecked={form.fields.tos.defaultValue === 'on'}
+							label="I accept the terms of service"
+						/>
+					</Field>
+				</Playground>
+			</Form>
+		</ConformBoundary>
 	);
 }
 

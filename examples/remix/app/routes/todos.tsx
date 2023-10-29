@@ -1,6 +1,6 @@
 import {
 	type FieldName,
-	FormProvider,
+	ConformBoundary,
 	useForm,
 	useFieldset,
 	useFieldList,
@@ -43,16 +43,15 @@ export default function TodoForm() {
 		onValidate({ formData }) {
 			return parse(formData, { schema: todosSchema });
 		},
-		shouldValidate: 'onBlur',
 	});
 	const tasks = useFieldList({
-		form: config.id,
+		formId: config.id,
 		name: fields.tasks.name,
 		context,
 	});
 
 	return (
-		<FormProvider formId={config.id} context={context}>
+		<ConformBoundary formId={config.id} context={context}>
 			<Form method="post" {...conform.form(config)}>
 				<div>
 					<label>Title</label>
@@ -68,7 +67,8 @@ export default function TodoForm() {
 					<p key={task.key}>
 						<TaskFieldset
 							title={`Task #${index + 1}`}
-							{...conform.fieldset(task)}
+							name={task.name}
+							form={task.formId}
 						/>
 						<button
 							{...intent.list(fields.tasks, { operation: 'remove', index })}
@@ -109,7 +109,7 @@ export default function TodoForm() {
 				<hr />
 				<button>Save</button>
 			</Form>
-		</FormProvider>
+		</ConformBoundary>
 	);
 }
 
@@ -121,7 +121,7 @@ interface TaskFieldsetProps {
 
 function TaskFieldset({ title, name, form }: TaskFieldsetProps) {
 	const task = useFieldset({
-		form,
+		formId: form,
 		name,
 	});
 
@@ -130,7 +130,7 @@ function TaskFieldset({ title, name, form }: TaskFieldsetProps) {
 			<div>
 				<label>{title}</label>
 				<input
-					className={task.content.errors.length > 0 ? 'error' : ''}
+					className={task.content.invalid ? 'error' : ''}
 					{...conform.input(task.content)}
 				/>
 				<div>{task.content.errors}</div>
@@ -139,7 +139,7 @@ function TaskFieldset({ title, name, form }: TaskFieldsetProps) {
 				<label>
 					<span>Completed</span>
 					<input
-						className={task.completed.errors.length > 0 ? 'error' : ''}
+						className={task.completed.invalid ? 'error' : ''}
 						{...conform.input(task.completed, {
 							type: 'checkbox',
 						})}

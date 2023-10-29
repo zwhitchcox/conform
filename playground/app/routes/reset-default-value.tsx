@@ -1,4 +1,4 @@
-import { useForm, conform, FormState } from '@conform-to/react';
+import { ConformBoundary, useForm, conform } from '@conform-to/react';
 import { parse } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
@@ -71,41 +71,42 @@ export default function ExampleForm() {
 	}, [form.config.id, color]);
 
 	return (
-		<Form method="post" {...conform.form(form.config)}>
-			<FormState formId={form.config.id} context={form.context} />
-			<Playground
-				title="Payment Form"
-				description={
-					<div>
-						Please choose a color
-						<ul>
-							<li>
-								<Link className="text-red-600" to="?color=red">
-									Red
-								</Link>
-							</li>
-							<li>
-								<Link className="text-green-600" to="?color=green">
-									Green
-								</Link>
-							</li>
-							<li>
-								<Link className="text-blue-600" to="?color=blue">
-									Blue
-								</Link>
-							</li>
-						</ul>
-					</div>
-				}
-				lastSubmission={lastResult}
-			>
-				<Field label="Name" config={form.fields.name}>
-					<input {...conform.input(form.fields.name, { type: 'text' })} />
-				</Field>
-				<Field label="Code" config={form.fields.code}>
-					<input {...conform.input(form.fields.code, { type: 'color' })} />
-				</Field>
-			</Playground>
-		</Form>
+		<ConformBoundary formId={form.config.id} context={form.context}>
+			<Form method="post" {...conform.form(form.config)}>
+				<Playground
+					title="Payment Form"
+					description={
+						<div>
+							Please choose a color
+							<ul>
+								<li>
+									<Link className="text-red-600" to="?color=red">
+										Red
+									</Link>
+								</li>
+								<li>
+									<Link className="text-green-600" to="?color=green">
+										Green
+									</Link>
+								</li>
+								<li>
+									<Link className="text-blue-600" to="?color=blue">
+										Blue
+									</Link>
+								</li>
+							</ul>
+						</div>
+					}
+					lastSubmission={lastResult}
+				>
+					<Field label="Name" config={form.fields.name}>
+						<input {...conform.input(form.fields.name, { type: 'text' })} />
+					</Field>
+					<Field label="Code" config={form.fields.code}>
+						<input {...conform.input(form.fields.code, { type: 'color' })} />
+					</Field>
+				</Playground>
+			</Form>
+		</ConformBoundary>
 	);
 }

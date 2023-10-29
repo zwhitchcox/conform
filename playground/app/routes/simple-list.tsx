@@ -1,5 +1,5 @@
 import {
-	FormState,
+	ConformBoundary,
 	conform,
 	useFieldList,
 	useForm,
@@ -54,77 +54,78 @@ export default function SimpleList() {
 			: undefined,
 	});
 	const items = useFieldList({
-		form: form.config.id,
+		formId: form.config.id,
 		name: form.fields.items.name,
 		context: form.context,
 	});
 
 	return (
-		<Form method="post" {...conform.form(form.config)}>
-			<FormState formId={form.config.id} context={form.context} />
-			<Playground title="Simple list" lastSubmission={lastResult}>
-				<Alert errors={form.fields.items.errors} />
-				<ol>
-					{items.map((item, index) => (
-						<li key={item.key} className="border rounded-md p-4 mb-4">
-							<Field label={`Item #${index + 1}`} config={item}>
-								<input {...conform.input(item, { type: 'text' })} />
-							</Field>
-							<div className="flex flex-row gap-2">
-								<button
-									className="rounded-md border p-2 hover:border-black"
-									{...intent.list(form.fields.items, {
-										operation: 'remove',
-										index,
-									})}
-								>
-									Delete
-								</button>
-								<button
-									className="rounded-md border p-2 hover:border-black"
-									{...intent.list(form.fields.items, {
-										operation: 'reorder',
-										from: index,
-										to: 0,
-									})}
-								>
-									Move to top
-								</button>
-								<button
-									className="rounded-md border p-2 hover:border-black"
-									{...intent.list(form.fields.items, {
-										operation: 'replace',
-										index,
-										defaultValue: '',
-									})}
-								>
-									Clear
-								</button>
-							</div>
-						</li>
-					))}
-				</ol>
-				<div className="flex flex-row gap-2">
-					<button
-						className="rounded-md border p-2 hover:border-black"
-						{...intent.list(form.fields.items, {
-							operation: 'prepend',
-							defaultValue: '',
-						})}
-					>
-						Insert top
-					</button>
-					<button
-						className="rounded-md border p-2 hover:border-black"
-						{...intent.list(form.fields.items, {
-							operation: 'append',
-							defaultValue: '',
-						})}
-					>
-						Insert bottom
-					</button>
-				</div>
-			</Playground>
-		</Form>
+		<ConformBoundary formId={form.config.id} context={form.context}>
+			<Form method="post" {...conform.form(form.config)}>
+				<Playground title="Simple list" lastSubmission={lastResult}>
+					<Alert errors={form.fields.items.errors} />
+					<ol>
+						{items.map((item, index) => (
+							<li key={item.key} className="border rounded-md p-4 mb-4">
+								<Field label={`Item #${index + 1}`} config={item}>
+									<input {...conform.input(item, { type: 'text' })} />
+								</Field>
+								<div className="flex flex-row gap-2">
+									<button
+										className="rounded-md border p-2 hover:border-black"
+										{...intent.list(form.fields.items, {
+											operation: 'remove',
+											index,
+										})}
+									>
+										Delete
+									</button>
+									<button
+										className="rounded-md border p-2 hover:border-black"
+										{...intent.list(form.fields.items, {
+											operation: 'reorder',
+											from: index,
+											to: 0,
+										})}
+									>
+										Move to top
+									</button>
+									<button
+										className="rounded-md border p-2 hover:border-black"
+										{...intent.list(form.fields.items, {
+											operation: 'replace',
+											index,
+											defaultValue: '',
+										})}
+									>
+										Clear
+									</button>
+								</div>
+							</li>
+						))}
+					</ol>
+					<div className="flex flex-row gap-2">
+						<button
+							className="rounded-md border p-2 hover:border-black"
+							{...intent.list(form.fields.items, {
+								operation: 'prepend',
+								defaultValue: '',
+							})}
+						>
+							Insert top
+						</button>
+						<button
+							className="rounded-md border p-2 hover:border-black"
+							{...intent.list(form.fields.items, {
+								operation: 'append',
+								defaultValue: '',
+							})}
+						>
+							Insert bottom
+						</button>
+					</div>
+				</Playground>
+			</Form>
+		</ConformBoundary>
 	);
 }

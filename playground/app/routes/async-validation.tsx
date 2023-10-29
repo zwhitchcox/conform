@@ -1,4 +1,4 @@
-import { FormState, conform, useForm } from '@conform-to/react';
+import { ConformBoundary, conform, useForm } from '@conform-to/react';
 import { parse, refine } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
@@ -78,19 +78,20 @@ export default function EmployeeForm() {
 	});
 
 	return (
-		<Form method="post" {...conform.form(form.config)}>
-			<FormState formId={form.id} context={form.context} />
-			<Playground title="Employee Form" lastSubmission={lastResult}>
-				<Field label="Email" config={form.fields.email}>
-					<input
-						{...conform.input(form.fields.email, { type: 'email' })}
-						autoComplete="off"
-					/>
-				</Field>
-				<Field label="Title" config={form.fields.title}>
-					<input {...conform.input(form.fields.title, { type: 'text' })} />
-				</Field>
-			</Playground>
-		</Form>
+		<ConformBoundary formId={form.config.id} context={form.context}>
+			<Form method="post" {...conform.form(form.config)}>
+				<Playground title="Employee Form" lastSubmission={lastResult}>
+					<Field label="Email" config={form.fields.email}>
+						<input
+							{...conform.input(form.fields.email, { type: 'email' })}
+							autoComplete="off"
+						/>
+					</Field>
+					<Field label="Title" config={form.fields.title}>
+						<input {...conform.input(form.fields.title, { type: 'text' })} />
+					</Field>
+				</Playground>
+			</Form>
+		</ConformBoundary>
 	);
 }

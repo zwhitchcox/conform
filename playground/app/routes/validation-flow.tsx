@@ -1,4 +1,4 @@
-import { FormState, conform, useForm } from '@conform-to/react';
+import { ConformBoundary, conform, useForm } from '@conform-to/react';
 import { parse } from '@conform-to/zod';
 import type { ActionArgs, LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
@@ -69,30 +69,31 @@ export default function ValidationFlow() {
 	});
 
 	return (
-		<Form method="post" {...conform.form(form.config)}>
-			<FormState formId={form.id} context={form.context} />
-			<Playground title="Validation Flow" lastSubmission={lastResult}>
-				<Field label="Email" config={form.fields.email}>
-					<input {...conform.input(form.fields.email, { type: 'email' })} />
-				</Field>
-				<Field label="Password" config={form.fields.password}>
-					<input
-						{...conform.input(form.fields.password, { type: 'password' })}
-					/>
-				</Field>
-				<Field label="Confirm password" config={form.fields.confirmPassword}>
-					<input
-						{...conform.input(form.fields.confirmPassword, {
-							type: 'password',
-						})}
-					/>
-				</Field>
-				{showInputWithNoName ? (
-					<Field label="Input with no name">
-						<input type="text" name="" />
+		<ConformBoundary formId={form.config.id} context={form.context}>
+			<Form method="post" {...conform.form(form.config)}>
+				<Playground title="Validation Flow" lastSubmission={lastResult}>
+					<Field label="Email" config={form.fields.email}>
+						<input {...conform.input(form.fields.email, { type: 'email' })} />
 					</Field>
-				) : null}
-			</Playground>
-		</Form>
+					<Field label="Password" config={form.fields.password}>
+						<input
+							{...conform.input(form.fields.password, { type: 'password' })}
+						/>
+					</Field>
+					<Field label="Confirm password" config={form.fields.confirmPassword}>
+						<input
+							{...conform.input(form.fields.confirmPassword, {
+								type: 'password',
+							})}
+						/>
+					</Field>
+					{showInputWithNoName ? (
+						<Field label="Input with no name">
+							<input type="text" name="" />
+						</Field>
+					) : null}
+				</Playground>
+			</Form>
+		</ConformBoundary>
 	);
 }

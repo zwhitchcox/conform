@@ -9,7 +9,7 @@ import {
 	type SubmissionResult,
 	type Submission,
 	type DefaultValue,
-	type Form as FormMetadata,
+	type Form as FormContext,
 	flatten,
 	requestIntent,
 	isFieldElement,
@@ -42,9 +42,9 @@ export interface BaseConfig {
 }
 
 export interface Options<Type> {
-	form: string;
+	formId: string;
 	name?: FieldName<Type>;
-	context?: FormMetadata;
+	context?: FormContext;
 }
 
 export interface FormConfig extends BaseConfig {
@@ -53,19 +53,19 @@ export interface FormConfig extends BaseConfig {
 }
 
 export interface Form<Type> {
-	context: FormMetadata;
+	context: FormContext;
 	errors: string[];
 	config: FormConfig;
-	fields: Fieldset<Type>;
+	fields: FieldsetConfig<Type>;
 }
 
-export type Fieldset<Type> = Type extends Array<any>
+export type FieldsetConfig<Type> = Type extends Array<any>
 	? { [Key in keyof Type]: FieldConfig<Type[Key]> }
 	: Type extends { [key in string]?: any }
 	? { [Key in KeysOf<Type>]: FieldConfig<KeyType<Type, Key>> }
 	: never;
 
-export type FieldList<Item> = Array<FieldConfig<Item> & { key: string }>;
+export type FieldListConfig<Item> = Array<FieldConfig<Item> & { key: string }>;
 
 export interface FieldConfig<Type> extends BaseConfig {
 	formId: string;
@@ -75,12 +75,12 @@ export interface FieldConfig<Type> extends BaseConfig {
 	errors: string[];
 }
 
-const FormContext = createContext<Record<string, FormMetadata>>({});
+const FormContext = createContext<Record<string, FormContext>>({});
 
 export function useFormContext(
 	formId: string,
-	localContext?: FormMetadata,
-): FormMetadata {
+	localContext?: FormContext,
+): FormContext {
 	const context = useContext(FormContext);
 	const result = localContext ?? context[formId];
 
@@ -91,9 +91,9 @@ export function useFormContext(
 	return result;
 }
 
-export function FormProvider(props: {
+export function ConformBoundary(props: {
 	formId: string;
-	context: FormMetadata;
+	context: FormContext;
 	children: ReactNode;
 }) {
 	const context = useContext(FormContext);
@@ -102,9 +102,20 @@ export function FormProvider(props: {
 		[context, props.formId, props.context],
 	);
 
-	return createElement(FormContext.Provider, {
-		value,
-		children: props.children,
+	return createElement(FormContext.Provider, { value }, [
+		createElement(FormStateInput, { formId: props.formId }),
+		props.children,
+	]);
+}
+
+export function FormStateInput(props: { formId: string }): React.ReactElement {
+	const context = useFormContext(props.formId);
+
+	return createElement('input', {
+		type: 'hidden',
+		form: props.formId,
+		name: '__state__',
+		value: JSON.stringify(context.state),
 	});
 }
 
@@ -122,24 +133,6 @@ export function useNoValidate(defaultNoValidate = true): boolean {
 	}, []);
 
 	return noValidate;
-}
-
-export function FormState(props: {
-	formId: string;
-	context: FormMetadata;
-}): React.ReactElement {
-	const context = useFormContext(props.formId, props.context);
-
-	return createElement(
-		'fieldset',
-		{ form: props.formId, hidden: true },
-		createElement('input', {
-			type: 'hidden',
-			form: props.formId,
-			name: '__state__',
-			value: JSON.stringify(context.state),
-		}),
-	);
 }
 
 export function generateIds(formId: string, name?: string) {
@@ -162,7 +155,7 @@ export function getName(key: string | number, prefix?: string) {
 
 export function getFieldConfig<Type>(
 	formId: string,
-	context: FormMetadata,
+	context: FormContext,
 	name = '',
 ): FieldConfig<Type> {
 	const errors = context.error[name] ?? [];
@@ -171,7 +164,7 @@ export function getFieldConfig<Type>(
 		...generateIds(formId, name),
 		name,
 		defaultValue: context.initialValue[name] as DefaultValue<Type>,
-		constraint: context.attributes.constraint[name] ?? {},
+		constraint: context.metadata.constraint[name] ?? {},
 		invalid: errors.length > 0,
 		errors,
 	};
@@ -214,12 +207,12 @@ export function useForm<
 	const noValidate = useNoValidate(config.defaultNoValidate);
 	const configRef = useRef(config);
 	const { errorId, descriptionId, errors } = useField<Type>({
-		form: formId,
-		name: '',
+		formId,
 		context,
+		name: '',
 	});
 	const fields = useFieldset<Type>({
-		form: formId,
+		formId,
 		context,
 	});
 
@@ -312,14 +305,16 @@ export function useForm<
 	};
 }
 
-export function useFieldset<Type>(options: Options<Type>): Fieldset<Type> {
-	const context = useFormContext(options.form, options.context);
+export function useFieldset<Type>(
+	options: Options<Type>,
+): FieldsetConfig<Type> {
+	const context = useFormContext(options.formId, options.context);
 
 	return new Proxy({} as any, {
 		get(_target, prop) {
 			const getConfig = (key: string | number) => {
 				const name = getName(key, options.name);
-				const config = getFieldConfig(options.form, context, name);
+				const config = getFieldConfig(options.formId, context, name);
 
 				return config;
 			};
@@ -374,8 +369,8 @@ export interface FieldListOptions<Item> extends Omit<Options<Item[]>, 'name'> {
 
 export function useFieldList<Item>(
 	options: FieldListOptions<Item>,
-): FieldList<Item> {
-	const context = useFormContext(options.form, options.context);
+): FieldListConfig<Item> {
+	const context = useFormContext(options.formId, options.context);
 	const keys = useMemo(
 		() =>
 			context.state.listKeys[options.name] ??
@@ -385,7 +380,7 @@ export function useFieldList<Item>(
 
 	return keys.map((key, index) => {
 		const name = getName(index, options.name);
-		const config = getFieldConfig<Item>(options.form, context, name);
+		const config = getFieldConfig<Item>(options.formId, context, name);
 
 		return {
 			...config,
@@ -395,8 +390,8 @@ export function useFieldList<Item>(
 }
 
 export function useField<Type>(options: Options<Type>): FieldConfig<Type> {
-	const metadata = useFormContext(options.form, options.context);
-	const field = getFieldConfig<Type>(options.form, metadata, options.name);
+	const context = useFormContext(options.formId, options.context);
+	const field = getFieldConfig<Type>(options.formId, context, options.name);
 
 	return field;
 }

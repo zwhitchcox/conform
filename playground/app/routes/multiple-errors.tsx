@@ -1,4 +1,4 @@
-import { FormState, conform, useForm } from '@conform-to/react';
+import { ConformBoundary, conform, useForm } from '@conform-to/react';
 import { parse as parseWithZod } from '@conform-to/zod';
 // import { parse as parseWithYup } from '@conform-to/yup';
 import { type LoaderArgs, type ActionArgs, json } from '@remix-run/node';
@@ -138,13 +138,14 @@ export default function Example() {
 	});
 
 	return (
-		<Form method="post" {...conform.form(form.config)}>
-			<FormState formId={form.id} context={form.context} />
-			<Playground title="Mutliple Errors" lastSubmission={lastResult}>
-				<Field label="Username" config={form.fields.username}>
-					<input {...conform.input(form.fields.username, { type: 'text' })} />
-				</Field>
-			</Playground>
-		</Form>
+		<ConformBoundary formId={form.config.id} context={form.context}>
+			<Form method="post" {...conform.form(form.config)}>
+				<Playground title="Mutliple Errors" lastSubmission={lastResult}>
+					<Field label="Username" config={form.fields.username}>
+						<input {...conform.input(form.fields.username, { type: 'text' })} />
+					</Field>
+				</Playground>
+			</Form>
+		</ConformBoundary>
 	);
 }
