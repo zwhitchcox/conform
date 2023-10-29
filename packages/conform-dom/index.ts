@@ -13,7 +13,6 @@ export {
 	type Primitive,
 	type DefaultValue,
 } from './types.js';
-export { type Registry, createRegistry } from './registry.js';
 export { createForm } from './form.js';
 export { isFieldElement } from './dom.js';
 export { invariant } from './util.js';
