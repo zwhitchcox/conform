@@ -1,4 +1,4 @@
-import type { Form, Fieldset, FieldList, Field } from './hooks.js';
+import type { FormConfig, Field } from './hooks.js';
 import type { CSSProperties, HTMLInputTypeAttribute } from 'react';
 
 interface FormElementProps {
@@ -57,10 +57,10 @@ type ControlOptions = BaseOptions & {
 	hidden?: boolean;
 };
 
-type FormOptions<Type> = BaseOptions & {
+type FormOptions = BaseOptions & {
 	onSubmit: (
 		event: React.FormEvent<HTMLFormElement>,
-		context: ReturnType<Form<Type>['onSubmit']>,
+		context: ReturnType<FormConfig['onSubmit']>,
 	) => void;
 };
 
@@ -245,33 +245,33 @@ export function textarea<Schema extends Primitive | undefined | unknown>(
 	});
 }
 
-export function form<
-	Schema extends Record<string, unknown> | undefined | unknown,
->(form: Form<Schema>, options?: FormOptions<Schema>) {
+export function form(config: FormConfig, options?: FormOptions) {
 	return cleanup({
-		id: form.id,
+		id: config.id,
 		onSubmit:
 			typeof options?.onSubmit !== 'function'
-				? form.onSubmit
+				? config.onSubmit
 				: (event: React.FormEvent<HTMLFormElement>) => {
-						const context = form.onSubmit(event);
+						const context = config.onSubmit(event);
 
 						if (!event.defaultPrevented) {
 							options.onSubmit(event, context);
 						}
 				  },
-		noValidate: form.noValidate,
-		...getAriaAttributes(form, options),
+		noValidate: config.noValidate,
+		...getAriaAttributes(config, options),
 	});
 }
 
 export function fieldset<
 	Schema extends Record<string, unknown> | undefined | unknown,
->(
-	field: Fieldset<Schema> | FieldList<Schema>,
-	options?: BaseOptions,
-): FormControlProps {
-	return getFormElementProps(field, options);
+>(field: Field<Schema>, options?: BaseOptions) {
+	return cleanup({
+		id: field.id,
+		name: field.name,
+		form: field.formId,
+		...getAriaAttributes(field, options),
+	});
 }
 
 export function collection<

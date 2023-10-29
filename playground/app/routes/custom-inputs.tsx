@@ -48,7 +48,7 @@ export default function Example() {
 	});
 
 	return (
-		<Form method="post" {...conform.form(form)}>
+		<Form method="post" {...conform.form(form.config)}>
 			<FormState formId={form.id} context={form.context} />
 			<Playground title="Custom Inputs Form" lastSubmission={lastResult}>
 				<Field label="Headless ListBox" config={form.fields.language}>

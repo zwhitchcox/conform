@@ -33,7 +33,7 @@ export default function Example() {
 			action={options.formAction ?? undefined}
 			method={options.formMethod ?? undefined}
 			encType={options.formEncType ?? undefined}
-			{...conform.form(form, {
+			{...conform.form(form.config, {
 				onSubmit(event, { method, action, encType }) {
 					event.preventDefault();
 

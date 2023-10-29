@@ -34,33 +34,34 @@ import {
 } from 'react';
 import { validate } from './intent.js';
 
-export interface Form<Type>
-	extends Pick<
-		Fieldset<Type>,
-		'id' | 'descriptionId' | 'errorId' | 'errors' | 'fields'
-	> {
-	context: FormMetadata;
+export interface FormConfig {
+	id: string;
+	descriptionId: string;
+	errorId: string;
+	errors: string[];
 	onSubmit: (event: React.FormEvent<HTMLFormElement>) => any;
 	noValidate: boolean;
 }
 
-export interface Fieldset<Type> extends Omit<Field<Type>, 'name'> {
-	name: FieldName<Type> | undefined;
-	fields: Type extends Array<any>
-		? { [Key in keyof Type]: Field<Type[Key]> }
-		: Type extends { [key in string]?: any }
-		? { [Key in KeysOf<Type>]: Field<KeyType<Type, Key>> }
-		: never;
+export interface Form<Type> {
+	id: string;
+	context: FormMetadata;
+	errors: string[];
+	config: FormConfig;
+	fields: Fieldset<Type>;
 }
 
-export interface FieldList<Item> extends Field<Item[]> {
-	list: Array<Field<Item> & { key: string }>;
-}
+export type Fieldset<Type> = Type extends Array<any>
+	? { [Key in keyof Type]: Field<Type[Key]> }
+	: Type extends { [key in string]?: any }
+	? { [Key in KeysOf<Type>]: Field<KeyType<Type, Key>> }
+	: never;
+
+export type FieldList<Item> = Array<Field<Item> & { key: string }>;
 
 export interface Field<Type> {
 	id: string;
 	formId: string;
-	context: FormMetadata;
 	errorId: string;
 	descriptionId: string;
 	name: FieldName<Type>;
@@ -136,7 +137,7 @@ export function FormState(props: {
 	);
 }
 
-export function generateIds(formId: string, name: string) {
+export function generateIds(formId: string, name?: string) {
 	const id = name ? `${formId}-${name}` : formId;
 
 	return {
@@ -205,8 +206,13 @@ export function useForm<
 	const [context, setContext] = useState(form.context);
 	const noValidate = useNoValidate(config.defaultNoValidate);
 	const configRef = useRef(config);
-	const { errorId, descriptionId, fields, errors } = useFieldset<Type>({
-		formId,
+	const { errorId, descriptionId, errors } = useField<Type>({
+		form: formId,
+		name: '',
+		context,
+	});
+	const fields = useFieldset<Type>({
+		form: formId,
 		context,
 	});
 
@@ -286,59 +292,54 @@ export function useForm<
 
 	return {
 		id: formId,
+		config: {
+			id: formId,
+			errorId,
+			descriptionId,
+			onSubmit,
+			noValidate,
+			errors,
+		},
 		context,
-		errorId,
-		descriptionId,
-		onSubmit,
-		noValidate,
 		errors,
 		fields,
 	};
 }
 
 export function useFieldset<Type>(config: {
-	formId: string;
+	form: string;
 	name?: FieldName<Type>;
 	context?: FormMetadata;
 }): Fieldset<Type> {
-	const field = useField({
-		formId: config.formId,
-		name: config.name ?? '',
-		context: config.context,
+	const metadata = useFormContext(config.form, config.context);
+
+	return new Proxy({} as any, {
+		get(_target, prop) {
+			const getField = (key: string | number) => {
+				const name = getName(key, config.name);
+				const field = getFieldConfig(config.form, name, metadata);
+
+				return field;
+			};
+
+			// To support array destructuring
+			if (prop === Symbol.iterator) {
+				let index = 0;
+
+				return () => ({
+					next: () => ({ value: getField(index++), done: false }),
+				});
+			}
+
+			const index = Number(prop);
+
+			if (typeof prop === 'string') {
+				return getField(Number.isNaN(index) ? prop : index);
+			}
+
+			return;
+		},
 	});
-	const metadata = useFormContext(config.formId, config.context);
-
-	return {
-		...field,
-		name: field.name !== '' ? field.name : undefined,
-		fields: new Proxy({} as any, {
-			get(_target, prop) {
-				const getField = (key: string | number) => {
-					const name = getName(key, config.name);
-					const field = getFieldConfig(config.formId, name, metadata);
-
-					return field;
-				};
-
-				// To support array destructuring
-				if (prop === Symbol.iterator) {
-					let index = 0;
-
-					return () => ({
-						next: () => ({ value: getField(index++), done: false }),
-					});
-				}
-
-				const index = Number(prop);
-
-				if (typeof prop === 'string') {
-					return getField(Number.isNaN(index) ? prop : index);
-				}
-
-				return;
-			},
-		}),
-	};
 }
 
 /**
@@ -366,12 +367,11 @@ function getDefaultListKeys(
 }
 
 export function useFieldList<Item>(config: {
-	formId: string;
+	form: string;
 	name: FieldName<Item[]>;
 	context?: FormMetadata;
 }): FieldList<Item> {
-	const field = useField(config);
-	const metadata = useFormContext(config.formId, config.context);
+	const metadata = useFormContext(config.form, config.context);
 	const keys = useMemo(
 		() =>
 			metadata.state.listKeys[config.name] ??
@@ -379,29 +379,26 @@ export function useFieldList<Item>(config: {
 		[config.name, metadata.initialValue, metadata.state.listKeys],
 	);
 
-	return {
-		...field,
-		list: keys.map((key, index) => {
-			const name = getName(index, config.name);
-			const field = getFieldConfig(config.formId, name, metadata);
+	return keys.map((key, index) => {
+		const name = getName(index, config.name);
+		const field = getFieldConfig(config.form, name, metadata);
 
-			return {
-				...field,
-				key,
-				defaultValue: field.defaultValue as Item | string | undefined,
-			};
-		}),
-	};
+		return {
+			...field,
+			key,
+			defaultValue: field.defaultValue as Item | string | undefined,
+		};
+	});
 }
 
 export function useField<Type>(config: {
-	formId: string;
+	form: string;
 	name: FieldName<Type>;
 	context?: FormMetadata;
 }): Field<Type> {
-	const metadata = useFormContext(config.formId, config.context);
+	const metadata = useFormContext(config.form, config.context);
 	const name = config.name;
-	const field = getFieldConfig(config.formId, name, metadata);
+	const field = getFieldConfig(config.form, name, metadata);
 
 	return {
 		...field,

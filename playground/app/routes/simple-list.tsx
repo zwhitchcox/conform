@@ -53,15 +53,19 @@ export default function SimpleList() {
 			? ({ formData }) => parse(formData, { schema })
 			: undefined,
 	});
-	const items = useFieldList(form.fields.items);
+	const items = useFieldList({
+		form: form.config.id,
+		name: form.fields.items.name,
+		context: form.context,
+	});
 
 	return (
-		<Form method="post" {...conform.form(form)}>
-			<FormState formId={form.id} context={form.context} />
+		<Form method="post" {...conform.form(form.config)}>
+			<FormState formId={form.config.id} context={form.context} />
 			<Playground title="Simple list" lastSubmission={lastResult}>
-				<Alert errors={items.errors} />
+				<Alert errors={form.fields.items.errors} />
 				<ol>
-					{items.list.map((item, index) => (
+					{items.map((item, index) => (
 						<li key={item.key} className="border rounded-md p-4 mb-4">
 							<Field label={`Item #${index + 1}`} config={item}>
 								<input {...conform.input(item, { type: 'text' })} />
@@ -69,13 +73,16 @@ export default function SimpleList() {
 							<div className="flex flex-row gap-2">
 								<button
 									className="rounded-md border p-2 hover:border-black"
-									{...intent.list(items, { operation: 'remove', index })}
+									{...intent.list(form.fields.items, {
+										operation: 'remove',
+										index,
+									})}
 								>
 									Delete
 								</button>
 								<button
 									className="rounded-md border p-2 hover:border-black"
-									{...intent.list(items, {
+									{...intent.list(form.fields.items, {
 										operation: 'reorder',
 										from: index,
 										to: 0,
@@ -85,7 +92,7 @@ export default function SimpleList() {
 								</button>
 								<button
 									className="rounded-md border p-2 hover:border-black"
-									{...intent.list(items, {
+									{...intent.list(form.fields.items, {
 										operation: 'replace',
 										index,
 										defaultValue: '',
@@ -100,13 +107,19 @@ export default function SimpleList() {
 				<div className="flex flex-row gap-2">
 					<button
 						className="rounded-md border p-2 hover:border-black"
-						{...intent.list(items, { operation: 'prepend', defaultValue: '' })}
+						{...intent.list(form.fields.items, {
+							operation: 'prepend',
+							defaultValue: '',
+						})}
 					>
 						Insert top
 					</button>
 					<button
 						className="rounded-md border p-2 hover:border-black"
-						{...intent.list(items, { operation: 'append', defaultValue: '' })}
+						{...intent.list(form.fields.items, {
+							operation: 'append',
+							defaultValue: '',
+						})}
 					>
 						Insert bottom
 					</button>

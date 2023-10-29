@@ -71,7 +71,7 @@ export default function ExampleForm() {
 	}, [form.id, color]);
 
 	return (
-		<Form method="post" {...conform.form(form)}>
+		<Form method="post" {...conform.form(form.config)}>
 			<FormState formId={form.id} context={form.context} />
 			<Playground
 				title="Payment Form"

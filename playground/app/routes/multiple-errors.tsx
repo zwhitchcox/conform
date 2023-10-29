@@ -138,7 +138,7 @@ export default function Example() {
 	});
 
 	return (
-		<Form method="post" {...conform.form(form)}>
+		<Form method="post" {...conform.form(form.config)}>
 			<FormState formId={form.id} context={form.context} />
 			<Playground title="Mutliple Errors" lastSubmission={lastResult}>
 				<Field label="Username" config={form.fields.username}>

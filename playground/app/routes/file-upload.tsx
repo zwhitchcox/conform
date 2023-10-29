@@ -54,7 +54,11 @@ export default function FileUpload() {
 	});
 
 	return (
-		<Form method="post" {...conform.form(form)} encType="multipart/form-data">
+		<Form
+			method="post"
+			{...conform.form(form.config)}
+			encType="multipart/form-data"
+		>
 			<FormState formId={form.id} context={form.context} />
 			<Playground title="Employee Form" lastSubmission={lastResult}>
 				<Alert errors={form.errors} />
