@@ -1,19 +1,16 @@
-import type { FormConfig, Field } from './hooks.js';
+import type { FormConfig, FieldConfig, BaseConfig } from './hooks.js';
 import type { CSSProperties, HTMLInputTypeAttribute } from 'react';
 
-interface FormElementProps {
-	id?: string;
-	name?: string;
-	form?: string;
-	'aria-describedby'?: string;
-	'aria-invalid'?: boolean;
-}
-
-interface FormControlProps extends FormElementProps {
+interface FormControlProps {
+	id: string;
+	name: string;
+	form: string;
 	required?: boolean;
 	autoFocus?: boolean;
 	tabIndex?: number;
 	style?: CSSProperties;
+	'aria-describedby'?: string;
+	'aria-invalid'?: boolean;
 	'aria-hidden'?: boolean;
 }
 
@@ -90,25 +87,18 @@ function cleanup<Props>(props: Props): Props {
 	return props;
 }
 
-function getAriaAttributes<
-	Config extends {
-		id: string;
-		errorId: string;
-		descriptionId: string;
-		errors: string[];
-	},
->(config: Config, options: BaseOptions = {}) {
+function getAriaAttributes<Config extends BaseConfig>(
+	config: Config,
+	options: BaseOptions = {},
+) {
 	const hasAriaAttributes = options.ariaAttributes ?? true;
 
 	return cleanup({
 		'aria-invalid':
-			(hasAriaAttributes && config.errorId && config.errors.length > 0) ||
-			undefined,
+			(hasAriaAttributes && config.errorId && config.invalid) || undefined,
 		'aria-describedby': hasAriaAttributes
 			? [
-					config.errorId && config.errors.length > 0
-						? config.errorId
-						: undefined,
+					config.errorId && config.invalid ? config.errorId : undefined,
 					config.descriptionId &&
 					options.ariaAttributes !== false &&
 					options.description
@@ -129,34 +119,19 @@ function getAriaAttributes<
 	});
 }
 
-function getFormElementProps<
-	Config extends {
-		id: string;
-		name?: string;
-		formId: string;
-		errorId: string;
-		descriptionId: string;
-		errors: string[];
-	},
->(config: Config, options: BaseOptions = {}): FormElementProps {
+function getFormControlProps(
+	config: FieldConfig<unknown>,
+	options?: ControlOptions,
+) {
 	return cleanup({
 		id: config.id,
 		name: config.name,
 		form: config.formId,
-		...getAriaAttributes(config, options),
-	});
-}
-
-function getFormControlProps(
-	field: Field<unknown>,
-	options?: ControlOptions,
-): FormControlProps {
-	return cleanup({
-		...getFormElementProps(field, options),
-		required: field.constraint.required,
+		required: config.constraint.required,
 		// FIXME: something to differentiate if the form is reloaded
 		autoFocus: false,
 		...(options?.hidden ? hiddenProps : undefined),
+		...getAriaAttributes(config, options),
 	});
 }
 
@@ -185,15 +160,15 @@ export const hiddenProps: {
 };
 
 export function input<Schema extends Primitive | unknown>(
-	field: Field<Schema>,
+	field: FieldConfig<Schema>,
 	options?: InputOptions,
 ): InputProps;
 export function input<Schema extends File | File[]>(
-	field: Field<Schema>,
+	field: FieldConfig<Schema>,
 	options: InputOptions & { type: 'file' },
 ): InputProps;
 export function input<Schema extends Primitive | File | File[] | unknown>(
-	field: Field<Schema>,
+	field: FieldConfig<Schema>,
 	options: InputOptions = {},
 ): InputProps {
 	const props: InputProps = {
@@ -223,7 +198,7 @@ export function input<Schema extends Primitive | File | File[] | unknown>(
 
 export function select<
 	Schema extends Primitive | Primitive[] | undefined | unknown,
->(field: Field<Schema>, options?: ControlOptions): SelectProps {
+>(field: FieldConfig<Schema>, options?: ControlOptions): SelectProps {
 	return cleanup({
 		...getFormControlProps(field, options),
 		defaultValue: Array.isArray(field.defaultValue)
@@ -234,7 +209,7 @@ export function select<
 }
 
 export function textarea<Schema extends Primitive | undefined | unknown>(
-	field: Field<Schema>,
+	field: FieldConfig<Schema>,
 	options?: ControlOptions,
 ): TextareaProps {
 	return cleanup({
@@ -265,7 +240,7 @@ export function form(config: FormConfig, options?: FormOptions) {
 
 export function fieldset<
 	Schema extends Record<string, unknown> | undefined | unknown,
->(field: Field<Schema>, options?: BaseOptions) {
+>(field: FieldConfig<Schema>, options?: BaseOptions) {
 	return cleanup({
 		id: field.id,
 		name: field.name,
@@ -282,7 +257,7 @@ export function collection<
 		| undefined
 		| unknown,
 >(
-	field: Field<Schema>,
+	field: FieldConfig<Schema>,
 	options: BaseOptions & {
 		type: 'checkbox' | 'radio';
 		options: string[];
@@ -291,7 +266,7 @@ export function collection<
 	return options.options.map((value) =>
 		cleanup({
 			...getFormControlProps(field, options),
-			id: field.id ? `${field.id}-${value}` : undefined,
+			id: `${field.id}-${value}`,
 			type: options.type,
 			value,
 			defaultChecked:

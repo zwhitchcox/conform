@@ -34,17 +34,25 @@ import {
 } from 'react';
 import { validate } from './intent.js';
 
-export interface FormConfig {
+export interface BaseConfig {
 	id: string;
-	descriptionId: string;
 	errorId: string;
-	errors: string[];
+	descriptionId: string;
+	invalid: boolean;
+}
+
+export interface Options<Type> {
+	form: string;
+	name?: FieldName<Type>;
+	context?: FormMetadata;
+}
+
+export interface FormConfig extends BaseConfig {
 	onSubmit: (event: React.FormEvent<HTMLFormElement>) => any;
 	noValidate: boolean;
 }
 
 export interface Form<Type> {
-	id: string;
 	context: FormMetadata;
 	errors: string[];
 	config: FormConfig;
@@ -52,20 +60,17 @@ export interface Form<Type> {
 }
 
 export type Fieldset<Type> = Type extends Array<any>
-	? { [Key in keyof Type]: Field<Type[Key]> }
+	? { [Key in keyof Type]: FieldConfig<Type[Key]> }
 	: Type extends { [key in string]?: any }
-	? { [Key in KeysOf<Type>]: Field<KeyType<Type, Key>> }
+	? { [Key in KeysOf<Type>]: FieldConfig<KeyType<Type, Key>> }
 	: never;
 
-export type FieldList<Item> = Array<Field<Item> & { key: string }>;
+export type FieldList<Item> = Array<FieldConfig<Item> & { key: string }>;
 
-export interface Field<Type> {
-	id: string;
+export interface FieldConfig<Type> extends BaseConfig {
 	formId: string;
-	errorId: string;
-	descriptionId: string;
 	name: FieldName<Type>;
-	defaultValue: Type | string | undefined;
+	defaultValue: DefaultValue<Type>;
 	constraint: Constraint;
 	errors: string[];
 }
@@ -155,18 +160,20 @@ export function getName(key: string | number, prefix?: string) {
 	return name;
 }
 
-export function getFieldConfig(
+export function getFieldConfig<Type>(
 	formId: string,
-	name: string,
 	context: FormMetadata,
-) {
+	name = '',
+): FieldConfig<Type> {
+	const errors = context.error[name] ?? [];
+
 	return {
 		...generateIds(formId, name),
-		context,
 		name,
-		defaultValue: context.initialValue[name],
+		defaultValue: context.initialValue[name] as DefaultValue<Type>,
 		constraint: context.attributes.constraint[name] ?? {},
-		errors: context.error[name] ?? [],
+		invalid: errors.length > 0,
+		errors,
 	};
 }
 
@@ -291,14 +298,13 @@ export function useForm<
 	);
 
 	return {
-		id: formId,
 		config: {
 			id: formId,
 			errorId,
 			descriptionId,
 			onSubmit,
 			noValidate,
-			errors,
+			invalid: errors.length > 0,
 		},
 		context,
 		errors,
@@ -306,20 +312,16 @@ export function useForm<
 	};
 }
 
-export function useFieldset<Type>(config: {
-	form: string;
-	name?: FieldName<Type>;
-	context?: FormMetadata;
-}): Fieldset<Type> {
-	const metadata = useFormContext(config.form, config.context);
+export function useFieldset<Type>(options: Options<Type>): Fieldset<Type> {
+	const context = useFormContext(options.form, options.context);
 
 	return new Proxy({} as any, {
 		get(_target, prop) {
-			const getField = (key: string | number) => {
-				const name = getName(key, config.name);
-				const field = getFieldConfig(config.form, name, metadata);
+			const getConfig = (key: string | number) => {
+				const name = getName(key, options.name);
+				const config = getFieldConfig(options.form, context, name);
 
-				return field;
+				return config;
 			};
 
 			// To support array destructuring
@@ -327,14 +329,14 @@ export function useFieldset<Type>(config: {
 				let index = 0;
 
 				return () => ({
-					next: () => ({ value: getField(index++), done: false }),
+					next: () => ({ value: getConfig(index++), done: false }),
 				});
 			}
 
 			const index = Number(prop);
 
 			if (typeof prop === 'string') {
-				return getField(Number.isNaN(index) ? prop : index);
+				return getConfig(Number.isNaN(index) ? prop : index);
 			}
 
 			return;
@@ -366,44 +368,37 @@ function getDefaultListKeys(
 		.map((_, index) => `${index}]`);
 }
 
-export function useFieldList<Item>(config: {
-	form: string;
-	name: FieldName<Item[]>;
-	context?: FormMetadata;
-}): FieldList<Item> {
-	const metadata = useFormContext(config.form, config.context);
+export interface FieldListOptions<Item> extends Omit<Options<Item[]>, 'name'> {
+	name: Required<Options<Item[]>>['name'];
+}
+
+export function useFieldList<Item>(
+	options: FieldListOptions<Item>,
+): FieldList<Item> {
+	const context = useFormContext(options.form, options.context);
 	const keys = useMemo(
 		() =>
-			metadata.state.listKeys[config.name] ??
-			getDefaultListKeys(metadata.initialValue, config.name),
-		[config.name, metadata.initialValue, metadata.state.listKeys],
+			context.state.listKeys[options.name] ??
+			getDefaultListKeys(context.initialValue, options.name),
+		[options.name, context.initialValue, context.state.listKeys],
 	);
 
 	return keys.map((key, index) => {
-		const name = getName(index, config.name);
-		const field = getFieldConfig(config.form, name, metadata);
+		const name = getName(index, options.name);
+		const config = getFieldConfig<Item>(options.form, context, name);
 
 		return {
-			...field,
+			...config,
 			key,
-			defaultValue: field.defaultValue as Item | string | undefined,
 		};
 	});
 }
 
-export function useField<Type>(config: {
-	form: string;
-	name: FieldName<Type>;
-	context?: FormMetadata;
-}): Field<Type> {
-	const metadata = useFormContext(config.form, config.context);
-	const name = config.name;
-	const field = getFieldConfig(config.form, name, metadata);
+export function useField<Type>(options: Options<Type>): FieldConfig<Type> {
+	const metadata = useFormContext(options.form, options.context);
+	const field = getFieldConfig<Type>(options.form, metadata, options.name);
 
-	return {
-		...field,
-		defaultValue: field.defaultValue as Type | string | undefined,
-	};
+	return field;
 }
 
 /**
