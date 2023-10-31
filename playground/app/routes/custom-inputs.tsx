@@ -53,7 +53,7 @@ export default function Example() {
 	});
 
 	return (
-		<ConformBoundary formId={form.config.id} context={form.context}>
+		<ConformBoundary context={form.context}>
 			<Form method="post" {...conform.form(form.config)}>
 				<Playground title="Custom Inputs Form" lastSubmission={lastResult}>
 					<Field label="Headless ListBox" config={form.fields.language}>

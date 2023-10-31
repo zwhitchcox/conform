@@ -41,7 +41,7 @@ export default function Validate() {
 	});
 
 	return (
-		<ConformBoundary formId={form.config.id} context={form.context}>
+		<ConformBoundary context={form.context}>
 			<Form method="post" {...conform.form(form.config)}>
 				<Playground title="Validate" lastSubmission={lastResult}>
 					<Field label="Name" config={form.fields.name}>

@@ -29,14 +29,7 @@ export type FormControl = FieldElement | HTMLButtonElement;
 
 export type Submitter = HTMLInputElement | HTMLButtonElement;
 
-export type Form = {
-	metadata: FormMetadata;
-	initialValue: Record<string, Primitive | Primitive[]>;
-	error: Record<string, string[]>;
-	state: FormState;
-};
-
-export type FormContext = {
+export type ResolveResult = {
 	intent: string | null;
 	state: FormState;
 	data: Record<string, unknown>;

@@ -59,6 +59,7 @@ type FormOptions = BaseOptions & {
 		event: React.FormEvent<HTMLFormElement>,
 		context: ReturnType<FormConfig['onSubmit']>,
 	) => void;
+	onReset: (event: React.FormEvent<HTMLFormElement>) => void;
 };
 
 type InputOptions = ControlOptions &
@@ -232,6 +233,13 @@ export function form(config: FormConfig, options?: FormOptions) {
 						if (!event.defaultPrevented) {
 							options.onSubmit(event, context);
 						}
+				  },
+		onReset:
+			typeof options?.onReset !== 'function'
+				? config.onReset
+				: (event: React.FormEvent<HTMLFormElement>) => {
+						config.onReset(event);
+						options.onReset(event);
 				  },
 		noValidate: config.noValidate,
 		...getAriaAttributes(config, options),

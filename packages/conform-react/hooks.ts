@@ -4,25 +4,23 @@ import {
 	type Constraint,
 	type FieldElement,
 	type FieldName,
+	type Form,
+	type FormContext,
 	type Primitive,
 	type SubmissionContext,
 	type SubmissionResult,
 	type Submission,
 	type DefaultValue,
-	type Form as FormContext,
-	flatten,
-	requestIntent,
+	createForm,
 	isFieldElement,
 	getPaths,
 	formatPaths,
-	createForm,
 } from '@conform-to/dom';
 import {
 	type RefObject,
 	type ReactNode,
 	createContext,
 	createElement,
-	startTransition,
 	useEffect,
 	useId,
 	useMemo,
@@ -31,8 +29,8 @@ import {
 	useLayoutEffect,
 	useCallback,
 	useContext,
+	useSyncExternalStore,
 } from 'react';
-import { validate } from './intent.js';
 
 export interface BaseConfig {
 	id: string;
@@ -44,16 +42,17 @@ export interface BaseConfig {
 export interface Options<Type> {
 	formId: string;
 	name?: FieldName<Type>;
-	context?: FormContext;
+	context?: Form;
 }
 
 export interface FormConfig extends BaseConfig {
 	onSubmit: (event: React.FormEvent<HTMLFormElement>) => any;
+	onReset: (event: React.FormEvent<HTMLFormElement>) => void;
 	noValidate: boolean;
 }
 
-export interface Form<Type> {
-	context: FormContext;
+export interface FormResult<Type extends Record<string, unknown>> {
+	context: Form<Type>;
 	errors: string[];
 	config: FormConfig;
 	fields: FieldsetConfig<Type>;
@@ -75,37 +74,50 @@ export interface FieldConfig<Type> extends BaseConfig {
 	errors: string[];
 }
 
-const FormContext = createContext<Record<string, FormContext>>({});
+const FormContext = createContext<Record<string, Form>>({});
 
 export function useFormContext(
 	formId: string,
-	localContext?: FormContext,
+	localContext?: Form,
 ): FormContext {
-	const context = useContext(FormContext);
-	const result = localContext ?? context[formId];
+	const registry = useContext(FormContext);
+	const form = localContext ?? registry[formId];
 
-	if (!result) {
+	if (!form) {
 		throw new Error('Form context is not available');
 	}
 
-	return result;
+	return useSyncExternalStore(
+		form.subscribe.bind(form),
+		form.getContext.bind(form),
+		form.getContext.bind(form),
+	);
 }
 
-export function ConformBoundary(props: {
-	formId: string;
-	context: FormContext;
-	children: ReactNode;
-}) {
+export function ConformBoundary(props: { context: Form; children: ReactNode }) {
 	const context = useContext(FormContext);
 	const value = useMemo(
-		() => ({ ...context, [props.formId]: props.context }),
-		[context, props.formId, props.context],
+		() => ({ ...context, [props.context.id]: props.context }),
+		[context, props.context],
 	);
 
-	return createElement(FormContext.Provider, { value }, [
-		createElement(FormStateInput, { formId: props.formId }),
-		props.children,
-	]);
+	return createElement(
+		FormContext.Provider,
+		{ value },
+		createElement(
+			'div',
+			{
+				onInput(event: React.ChangeEvent<HTMLDivElement>) {
+					props.context.input(event.nativeEvent);
+				},
+				onBlur(event: React.FocusEvent<HTMLDivElement>) {
+					props.context.blur(event.nativeEvent);
+				},
+			},
+			createElement(FormStateInput, { formId: props.context.id }),
+			props.children,
+		),
+	);
 }
 
 export function FormStateInput(props: { formId: string }): React.ReactElement {
@@ -135,17 +147,6 @@ export function useNoValidate(defaultNoValidate = true): boolean {
 	return noValidate;
 }
 
-export function generateIds(formId: string, name?: string) {
-	const id = name ? `${formId}-${name}` : formId;
-
-	return {
-		id,
-		formId,
-		errorId: `${id}-error`,
-		descriptionId: `${id}-description`,
-	};
-}
-
 export function getName(key: string | number, prefix?: string) {
 	const paths = getPaths(prefix ?? '');
 	const name = formatPaths([...paths, key]);
@@ -158,10 +159,14 @@ export function getFieldConfig<Type>(
 	context: FormContext,
 	name = '',
 ): FieldConfig<Type> {
+	const id = name ? `${formId}-${name}` : formId;
 	const errors = context.error[name] ?? [];
 
 	return {
-		...generateIds(formId, name),
+		id,
+		formId,
+		errorId: `${id}-error`,
+		descriptionId: `${id}-description`,
 		name,
 		defaultValue: context.initialValue[name] as DefaultValue<Type>,
 		constraint: context.metadata.constraint[name] ?? {},
@@ -185,17 +190,17 @@ export function useForm<
 		submitter,
 		formData,
 	}: SubmissionContext) => Submission<any>;
-}): Form<Type> {
+}): FormResult<Type> {
 	const formId = useFormId(config.id);
 	const initializeForm = () =>
-		createForm(
-			formId,
-			{
-				defaultValue: flatten(config.defaultValue ?? {}),
-				constraint: config.constraint ?? {},
-			},
-			config.lastResult,
-		);
+		createForm(formId, {
+			defaultValue: config.defaultValue,
+			constraint: config.constraint,
+			lastResult: config.lastResult,
+			onValidate: config.onValidate,
+			shouldValidate: config.shouldValidate,
+			shouldRevalidate: config.shouldRevalidate,
+		});
 	const [form, setForm] = useState(initializeForm);
 
 	// If id changes, reinitialize the form immediately
@@ -203,83 +208,46 @@ export function useForm<
 		setForm(initializeForm);
 	}
 
-	const [context, setContext] = useState(form.context);
 	const noValidate = useNoValidate(config.defaultNoValidate);
 	const configRef = useRef(config);
 	const { errorId, descriptionId, errors } = useField<Type>({
 		formId,
-		context,
+		context: form,
 		name: '',
 	});
 	const fields = useFieldset<Type>({
 		formId,
-		context,
+		context: form,
 	});
 
-	useEffect(
-		() =>
-			form.subscribe((context) => startTransition(() => setContext(context))),
-		[form],
-	);
-
 	useEffect(() => {
-		// Report only if the submission has changed
-		if (
-			config.lastResult &&
-			config.lastResult !== configRef.current.lastResult
-		) {
-			form.update(config.lastResult);
+		if (config.lastResult === configRef.current.lastResult) {
+			// If there is no change, do nothing
+			return;
+		}
+
+		if (config.lastResult) {
+			form.report(config.lastResult);
+		} else {
+			document.forms.namedItem(form.id)?.reset();
 		}
 	}, [form, config.lastResult]);
 
 	useEffect(() => {
 		configRef.current = config;
+		form.update({
+			defaultValue: config.defaultValue,
+			constraint: config.constraint,
+			shouldValidate: config.shouldValidate,
+			shouldRevalidate: config.shouldRevalidate,
+			onValidate: config.onValidate,
+		});
 	});
-
-	useEffect(() => {
-		const handleReset = (event: Event) =>
-			form.reset(event, {
-				defaultValue: flatten(configRef.current.defaultValue ?? {}),
-				constraint: configRef.current.constraint ?? {},
-			});
-		const handleEvent = (event: Event) =>
-			form.handleEvent(event, ({ type, form, element, validated }) => {
-				const {
-					shouldValidate = 'onSubmit',
-					shouldRevalidate = shouldValidate,
-				} = configRef.current;
-				const eventName = `on${type.slice(0, 1).toUpperCase()}${type
-					.slice(1)
-					.toLowerCase()}`;
-
-				if (
-					validated
-						? shouldRevalidate === eventName
-						: shouldValidate === eventName
-				) {
-					requestIntent(form, validate({ name: element.name }));
-				}
-			});
-
-		window.addEventListener('reset', handleReset);
-		window.addEventListener('input', handleEvent);
-		// blur event is not bubbling, so we need to use capture phase
-		window.addEventListener('blur', handleEvent, true);
-
-		return () => {
-			window.removeEventListener('reset', handleReset);
-			window.removeEventListener('input', handleEvent);
-			// blur event is not bubbling, so we need to use capture phase
-			window.removeEventListener('blur', handleEvent, true);
-		};
-	}, [form]);
 
 	const onSubmit = useCallback(
 		(event: React.FormEvent<HTMLFormElement>) => {
 			const submitEvent = event.nativeEvent as SubmitEvent;
-			const result = form.submit(submitEvent, {
-				onValidate: configRef.current.onValidate,
-			});
+			const result = form.submit(submitEvent);
 
 			if (submitEvent.defaultPrevented) {
 				event.preventDefault();
@@ -289,6 +257,10 @@ export function useForm<
 		},
 		[form],
 	);
+	const onReset = useCallback(
+		(event: React.FormEvent<HTMLFormElement>) => form.reset(event.nativeEvent),
+		[form],
+	);
 
 	return {
 		config: {
@@ -296,10 +268,11 @@ export function useForm<
 			errorId,
 			descriptionId,
 			onSubmit,
+			onReset,
 			noValidate,
 			invalid: errors.length > 0,
 		},
-		context,
+		context: form,
 		errors,
 		fields,
 	};

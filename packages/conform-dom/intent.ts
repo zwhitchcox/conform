@@ -1,4 +1,4 @@
-import type { DefaultValue, FormContext, SubmissionResult } from './types.js';
+import type { DefaultValue, ResolveResult, SubmissionResult } from './types.js';
 import { createSubmitter, requestSubmit } from './dom.js';
 import { setValue } from './formdata.js';
 import { invariant } from './util.js';
@@ -40,7 +40,7 @@ export function getIntent(payload: FormData | URLSearchParams): string | null {
 	return intent;
 }
 
-export function resolve(payload: FormData | URLSearchParams): FormContext {
+export function resolve(payload: FormData | URLSearchParams): ResolveResult {
 	const state = payload.get('__state__');
 	const intent = getIntent(payload);
 	const data: Record<string, unknown> = {};
@@ -254,7 +254,7 @@ export function requestIntent(
 }
 
 export function getIntentHandler(
-	form: FormContext,
+	form: ResolveResult,
 	intents: Array<Intent> = [validate, list],
 ): (result: Omit<Required<SubmissionResult>, 'status'>) => void {
 	if (form.intent) {

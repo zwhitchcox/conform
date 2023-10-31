@@ -71,7 +71,7 @@ export default function ExampleForm() {
 	}, [form.config.id, color]);
 
 	return (
-		<ConformBoundary formId={form.config.id} context={form.context}>
+		<ConformBoundary context={form.context}>
 			<Form method="post" {...conform.form(form.config)}>
 				<Playground
 					title="Payment Form"

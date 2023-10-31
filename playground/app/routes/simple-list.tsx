@@ -60,7 +60,7 @@ export default function SimpleList() {
 	});
 
 	return (
-		<ConformBoundary formId={form.config.id} context={form.context}>
+		<ConformBoundary context={form.context}>
 			<Form method="post" {...conform.form(form.config)}>
 				<Playground title="Simple list" lastSubmission={lastResult}>
 					<Alert errors={form.fields.items.errors} />

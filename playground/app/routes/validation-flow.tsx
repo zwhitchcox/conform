@@ -69,7 +69,7 @@ export default function ValidationFlow() {
 	});
 
 	return (
-		<ConformBoundary formId={form.config.id} context={form.context}>
+		<ConformBoundary context={form.context}>
 			<Form method="post" {...conform.form(form.config)}>
 				<Playground title="Validation Flow" lastSubmission={lastResult}>
 					<Field label="Email" config={form.fields.email}>
