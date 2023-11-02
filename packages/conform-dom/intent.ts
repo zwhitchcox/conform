@@ -1,6 +1,6 @@
 import type { DefaultValue, ResolveResult, SubmissionResult } from './types.js';
 import { createSubmitter, requestSubmit } from './dom.js';
-import { setValue } from './formdata.js';
+import { flatten, isPlainObject, setValue } from './formdata.js';
 import { invariant } from './util.js';
 
 export type Intent<Payload = unknown> = {
@@ -194,26 +194,22 @@ export const list = createIntent<
 			case 'append':
 			case 'prepend':
 			case 'replace':
+				updateState(result.state.validated, payload.name, {
+					...payload,
+					defaultValue: undefined,
+				});
 				updateList(keys, {
 					...payload,
 					defaultValue: (Date.now() * Math.random()).toString(36),
 				});
 				break;
 			default:
+				updateState(result.state.validated, payload.name, payload);
 				updateList(keys, payload);
 				break;
 		}
 
 		result.state.listKeys[payload.name] = keys;
-
-		if (payload.operation === 'remove' || payload.operation === 'replace') {
-			for (const name of Object.keys(result.state.validated)) {
-				if (name.startsWith(`${payload.name}[${payload.index}]`)) {
-					result.state.validated[name] = false;
-				}
-			}
-		}
-
 		result.state.validated[payload.name] = true;
 	},
 });
@@ -299,4 +295,62 @@ export function updateList<Schema>(
 		default:
 			throw new Error('Unknown list intent received');
 	}
+}
+
+export function updateState<Schema>(
+	data: Record<string, unknown>,
+	name: string,
+	payload: ListIntentPayload<Schema>,
+): void {
+	const root = Symbol.for('root');
+
+	// The keys are sorted in desc so that the root value is handled last
+	const keys = Object.keys(data).sort((prev, next) => next.localeCompare(prev));
+	const target: Record<string, unknown> = {};
+
+	for (const key of keys) {
+		const value = data[key];
+
+		if (key.startsWith(name) && key !== name) {
+			setValue(target, key, (prev) => {
+				if (typeof prev === 'undefined') {
+					return value;
+				}
+
+				// @ts-expect-error As key is unique, if prev is already defined, it must be either an object or an array
+				prev[root] = value;
+
+				return prev;
+			});
+
+			// Remove the value from the data
+			delete data[key];
+		}
+	}
+
+	const value = setValue(target, name, (value) => value ?? []);
+
+	if (!Array.isArray(value)) {
+		throw new Error('The name provided is not pointed to a list');
+	}
+
+	updateList(value, payload);
+
+	Object.assign(
+		data,
+		flatten(value, {
+			resolve(data) {
+				if (Array.isArray(data)) {
+					return null;
+				}
+
+				if (isPlainObject(data)) {
+					return data[root] ?? null;
+				}
+
+				return data;
+			},
+			prefix: name,
+		}),
+	);
 }

@@ -97,37 +97,54 @@ export function setValue<Value>(
 	return pointer;
 }
 
-export function flatten(
-	data: Record<string, unknown> | Array<unknown>,
-	prefix: string = '',
-): Record<string, string | string[]> {
-	const result: Record<string, string | string[]> = {};
+export function isPlainObject(
+	obj: unknown,
+): obj is Record<string | number | symbol, unknown> {
+	return (
+		!!obj &&
+		obj.constructor === Object &&
+		Object.getPrototypeOf(obj) === Object.prototype
+	);
+}
 
-	function processObject(obj: Object, prefix: string): void {
+export function flatten(
+	data: Record<string | number | symbol, unknown> | Array<unknown> | undefined,
+	options?: {
+		resolve?: (data: unknown) => unknown | null;
+		prefix?: string;
+	},
+): Record<string, unknown> {
+	const result: Record<string, unknown> = {};
+
+	function setResult(data: unknown, name: string) {
+		const value = options?.resolve?.(data) ?? data;
+
+		if (value !== null) {
+			result[name] = value;
+		}
+	}
+
+	function processObject(
+		obj: Record<string | number | symbol, unknown>,
+		prefix: string,
+	): void {
+		setResult(obj, prefix);
+
 		for (const [key, value] of Object.entries(obj)) {
 			const name = prefix ? `${prefix}.${key}` : key;
 
 			if (Array.isArray(value)) {
 				processArray(value, name);
-			} else if (value instanceof File) {
-				continue;
-			} else if (
-				!(value instanceof Date) &&
-				typeof value === 'object' &&
-				value !== null
-			) {
+			} else if (value && isPlainObject(value)) {
 				processObject(value, name);
 			} else {
-				result[name] = value;
+				setResult(value, name);
 			}
 		}
 	}
 
-	function processArray(array: any[], prefix: string): void {
-		// This creates an additional entry in case of checkbox group
-		if (array.every((item) => typeof item === 'string')) {
-			result[prefix] = array as string[];
-		}
+	function processArray(array: Array<unknown>, prefix: string): void {
+		setResult(array, prefix);
 
 		for (let i = 0; i < array.length; i++) {
 			const item = array[i];
@@ -135,24 +152,22 @@ export function flatten(
 
 			if (Array.isArray(item)) {
 				processArray(item, name);
-			} else if (item instanceof File) {
-				continue;
-			} else if (
-				!(item instanceof Date) &&
-				typeof item === 'object' &&
-				item !== null
-			) {
+			} else if (item && isPlainObject(item)) {
 				processObject(item, name);
 			} else {
-				result[name] = item;
+				setResult(item, name);
 			}
 		}
 	}
 
-	if (Array.isArray(data)) {
-		processArray(data, prefix);
-	} else {
-		processObject(data, prefix);
+	if (data) {
+		const prefix = options?.prefix ?? '';
+
+		if (Array.isArray(data)) {
+			processArray(data, prefix);
+		} else {
+			processObject(data, prefix);
+		}
 	}
 
 	return result;

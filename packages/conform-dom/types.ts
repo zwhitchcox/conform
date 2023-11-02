@@ -48,7 +48,7 @@ export type Constraint = {
 };
 
 export type FormMetadata = {
-	defaultValue: Record<string, Primitive | Primitive[]>;
+	defaultValue: Record<string, unknown>;
 	constraint: Record<string, Constraint>;
 };
 

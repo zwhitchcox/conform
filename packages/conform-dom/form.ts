@@ -12,7 +12,6 @@ import type {
 	SubmissionContext,
 	SubmissionResult,
 	DefaultValue,
-	Primitive,
 	FormState,
 	Constraint,
 } from './types.js';
@@ -21,7 +20,7 @@ import { requestIntent, validate } from './intent.js';
 
 export interface FormContext {
 	metadata: FormMetadata;
-	initialValue: Record<string, Primitive | Primitive[]>;
+	initialValue: Record<string, unknown>;
 	error: Record<string, string[]>;
 	state: FormState;
 }
@@ -51,10 +50,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 	formId: string,
 	options: FormOptions<Type>,
 ): Form<Type> {
-	const metadata: FormMetadata = {
-		defaultValue: flatten(options.defaultValue ?? {}),
-		constraint: options.constraint ?? {},
-	};
+	const metadata: FormMetadata = initializeMetadata(options);
 
 	let listeners: Array<() => void> = [];
 	let latestOptions = options;
@@ -72,6 +68,13 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		const element = document.forms.namedItem(formId);
 		invariant(element !== null, `Form#${formId} does not exist`);
 		return element;
+	}
+
+	function initializeMetadata(options: FormOptions<Type>): FormMetadata {
+		return {
+			defaultValue: flatten(options.defaultValue),
+			constraint: options.constraint ?? {},
+		};
 	}
 
 	function updateContext(update: FormContext) {
@@ -181,10 +184,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			return;
 		}
 
-		const metadata = {
-			defaultValue: flatten(latestOptions.defaultValue ?? {}),
-			constraint: latestOptions.constraint ?? {},
-		};
+		const metadata = initializeMetadata(latestOptions);
 
 		updateContext({
 			metadata,

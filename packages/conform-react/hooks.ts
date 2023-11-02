@@ -6,7 +6,6 @@ import {
 	type FieldName,
 	type Form,
 	type FormContext,
-	type Primitive,
 	type SubmissionContext,
 	type SubmissionResult,
 	type Submission,
@@ -316,22 +315,16 @@ export function useFieldset<Type>(
  * Derives the default list keys based on the path
  */
 function getDefaultListKeys(
-	defaultValue: Record<string, Primitive | Primitive[]>,
+	defaultValue: Record<string, unknown>,
 	listName: string,
 ): string[] {
-	let maxIndex = -1;
+	const list = defaultValue[listName] ?? [];
 
-	for (const name of Object.keys(defaultValue)) {
-		if (name.startsWith(listName)) {
-			const [index] = getPaths(name.slice(listName.length));
-
-			if (typeof index === 'number' && index > maxIndex) {
-				maxIndex = index;
-			}
-		}
+	if (!Array.isArray(list)) {
+		throw new Error('The default value at the given name is not a list');
 	}
 
-	return Array(maxIndex + 1)
+	return Array(list.length)
 		.fill('')
 		.map((_, index) => `${index}]`);
 }

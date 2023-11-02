@@ -25,4 +25,10 @@ export {
 	getIntentHandler,
 	resolve,
 } from './intent.js';
-export { getPaths, formatPaths, setValue, flatten } from './formdata.js';
+export {
+	getPaths,
+	formatPaths,
+	setValue,
+	flatten,
+	isPlainObject,
+} from './formdata.js';

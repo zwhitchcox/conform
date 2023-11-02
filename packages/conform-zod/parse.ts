@@ -6,6 +6,7 @@ import {
 	formatPaths,
 	resolve,
 	getIntentHandler,
+	isPlainObject,
 } from '@conform-to/dom';
 import {
 	type IssueData,
@@ -165,7 +166,23 @@ export function parse<Schema extends ZodTypeAny>(
 		updateState: (result: Omit<Required<SubmissionResult>, 'status'>) => void,
 	): Submission<Output> => {
 		const error = !result.success ? getError(result.error) : {};
-		const initialValue = flatten(context.data);
+		const initialValue = flatten(context.data, {
+			resolve(data) {
+				// File cannot be serialized
+				if (data instanceof File || isPlainObject(data)) {
+					return null;
+				} else if (typeof data === 'string') {
+					return data;
+				} else if (
+					Array.isArray(data) &&
+					data.every((item) => typeof item === 'string')
+				) {
+					return data;
+				}
+
+				throw new Error(`Invalid value: ${data}`);
+			},
+		}) as Record<string, string | string[]>;
 		const state = context.state;
 
 		updateState({
