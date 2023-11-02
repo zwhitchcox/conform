@@ -173,11 +173,8 @@ export function parse<Schema extends ZodTypeAny>(
 					return null;
 				} else if (typeof data === 'string') {
 					return data;
-				} else if (
-					Array.isArray(data) &&
-					data.every((item) => typeof item === 'string')
-				) {
-					return data;
+				} else if (Array.isArray(data)) {
+					return data.map((item) => (item instanceof File ? null : item));
 				}
 
 				throw new Error(`Invalid value: ${data}`);

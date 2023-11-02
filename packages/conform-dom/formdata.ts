@@ -115,9 +115,10 @@ export function flatten(
 	},
 ): Record<string, unknown> {
 	const result: Record<string, unknown> = {};
+	const resolve = options?.resolve ?? ((data) => data);
 
 	function setResult(data: unknown, name: string) {
-		const value = options?.resolve?.(data) ?? data;
+		const value = resolve(data);
 
 		if (value !== null) {
 			result[name] = value;
