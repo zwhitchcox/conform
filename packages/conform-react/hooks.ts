@@ -9,6 +9,7 @@ import {
 	type SubmissionContext,
 	type SubmissionResult,
 	type Submission,
+	type SubscriptionSubject,
 	type DefaultValue,
 	createForm,
 	isFieldElement,
@@ -18,6 +19,7 @@ import {
 import {
 	type RefObject,
 	type ReactNode,
+	type MutableRefObject,
 	createContext,
 	createElement,
 	useEffect,
@@ -63,9 +65,10 @@ export type FieldsetConfig<Type> = Type extends Array<any>
 	? { [Key in KeysOf<Type>]: FieldConfig<KeyType<Type, Key>> }
 	: never;
 
-export type FieldListConfig<Item> = Array<FieldConfig<Item> & { key: string }>;
+export type FieldListConfig<Item> = Array<FieldConfig<Item>>;
 
 export interface FieldConfig<Type> extends BaseConfig {
+	key?: string;
 	formId: string;
 	name: FieldName<Type>;
 	defaultValue: DefaultValue<Type>;
@@ -73,11 +76,17 @@ export interface FieldConfig<Type> extends BaseConfig {
 	errors: string[];
 }
 
+export type Subject = Record<
+	keyof SubscriptionSubject,
+	Record<string, boolean>
+>;
+
 const FormContext = createContext<Record<string, Form>>({});
 
 export function useFormContext(
 	formId: string,
-	localContext?: Form,
+	localContext?: Form | undefined,
+	subject?: MutableRefObject<SubscriptionSubject>,
 ): FormContext {
 	const registry = useContext(FormContext);
 	const form = localContext ?? registry[formId];
@@ -86,11 +95,17 @@ export function useFormContext(
 		throw new Error('Form context is not available');
 	}
 
-	return useSyncExternalStore(
-		form.subscribe.bind(form),
-		form.getContext.bind(form),
-		form.getContext.bind(form),
+	const subscribe = useCallback(
+		(callback: () => void) => form.subscribe(callback, () => subject?.current),
+		[form, subject],
 	);
+	const context = useSyncExternalStore(
+		subscribe,
+		form.getContext,
+		form.getContext,
+	);
+
+	return context;
 }
 
 export function ConformBoundary(props: { context: Form; children: ReactNode }) {
@@ -156,22 +171,43 @@ export function getName(key: string | number, prefix?: string) {
 export function getFieldConfig<Type>(
 	formId: string,
 	context: FormContext,
-	name = '',
+	options: {
+		name?: string;
+		key?: string;
+		subjectRef: MutableRefObject<Subject>;
+	},
 ): FieldConfig<Type> {
+	const name = options.name ?? '';
 	const id = name ? `${formId}-${name}` : formId;
 	const errors = context.error[name] ?? [];
 
-	return {
-		id,
-		formId,
-		errorId: `${id}-error`,
-		descriptionId: `${id}-description`,
-		name,
-		defaultValue: context.initialValue[name] as DefaultValue<Type>,
-		constraint: context.metadata.constraint[name] ?? {},
-		invalid: errors.length > 0,
-		errors,
-	};
+	return new Proxy(
+		{
+			key: options.key,
+			id,
+			formId,
+			errorId: `${id}-error`,
+			descriptionId: `${id}-description`,
+			name,
+			defaultValue: context.initialValue[name] as DefaultValue<Type>,
+			constraint: context.metadata.constraint[name] ?? {},
+			invalid: errors.length > 0,
+			errors,
+		},
+		{
+			get(target, prop) {
+				switch (prop) {
+					case 'errors':
+					case 'invalid':
+						options.subjectRef.current.error[name] = true;
+						break;
+				}
+
+				// @ts-expect-error It's fine
+				return target[prop];
+			},
+		},
+	);
 }
 
 export function useForm<
@@ -280,13 +316,17 @@ export function useForm<
 export function useFieldset<Type>(
 	options: Options<Type>,
 ): FieldsetConfig<Type> {
-	const context = useFormContext(options.formId, options.context);
+	const subjectRef = useSubjectRef();
+	const context = useFormContext(options.formId, options.context, subjectRef);
 
 	return new Proxy({} as any, {
 		get(_target, prop) {
 			const getConfig = (key: string | number) => {
 				const name = getName(key, options.name);
-				const config = getFieldConfig(options.formId, context, name);
+				const config = getFieldConfig(options.formId, context, {
+					name,
+					subjectRef,
+				});
 
 				return config;
 			};
@@ -311,24 +351,6 @@ export function useFieldset<Type>(
 	});
 }
 
-/**
- * Derives the default list keys based on the path
- */
-function getDefaultListKeys(
-	defaultValue: Record<string, unknown>,
-	listName: string,
-): string[] {
-	const list = defaultValue[listName] ?? [];
-
-	if (!Array.isArray(list)) {
-		throw new Error('The default value at the given name is not a list');
-	}
-
-	return Array(list.length)
-		.fill('')
-		.map((_, index) => `${index}]`);
-}
-
 export interface FieldListOptions<Item> extends Omit<Options<Item[]>, 'name'> {
 	name: Required<Options<Item[]>>['name'];
 }
@@ -336,28 +358,70 @@ export interface FieldListOptions<Item> extends Omit<Options<Item[]>, 'name'> {
 export function useFieldList<Item>(
 	options: FieldListOptions<Item>,
 ): FieldListConfig<Item> {
-	const context = useFormContext(options.formId, options.context);
-	const keys = useMemo(
-		() =>
-			context.state.listKeys[options.name] ??
-			getDefaultListKeys(context.initialValue, options.name),
-		[options.name, context.initialValue, context.state.listKeys],
-	);
+	const subjectRef = useSubjectRef({
+		key: {
+			[options.name]: true,
+		},
+	});
+	const context = useFormContext(options.formId, options.context, subjectRef);
+	const keys = useMemo(() => {
+		let keys = context.state.listKeys[options.name];
+
+		if (!keys) {
+			const list = context.metadata.defaultValue[options.name] ?? [];
+
+			if (!Array.isArray(list)) {
+				throw new Error('The default value at the given name is not a list');
+			}
+
+			keys = Array(list.length)
+				.fill('')
+				.map((_, index) => `${index}`);
+		}
+
+		return keys;
+	}, [options.name, context]);
 
 	return keys.map((key, index) => {
 		const name = getName(index, options.name);
-		const config = getFieldConfig<Item>(options.formId, context, name);
-
-		return {
-			...config,
+		const config = getFieldConfig<Item>(options.formId, context, {
+			name,
 			key,
-		};
+			subjectRef,
+		});
+
+		return config;
 	});
 }
 
+const defaultSubject: Subject = {
+	error: {},
+	validated: {},
+	key: {},
+};
+
+export function useSubjectRef(
+	initialSubject?: Partial<Subject>,
+): MutableRefObject<Subject> {
+	const subjectRef = useRef<Subject>(defaultSubject);
+
+	// Reset the subject everytime the component is rerendered
+	// This let us subscribe to data used in the last render only
+	subjectRef.current = {
+		...defaultSubject,
+		...initialSubject,
+	};
+
+	return subjectRef;
+}
+
 export function useField<Type>(options: Options<Type>): FieldConfig<Type> {
-	const context = useFormContext(options.formId, options.context);
-	const field = getFieldConfig<Type>(options.formId, context, options.name);
+	const subjectRef = useSubjectRef();
+	const context = useFormContext(options.formId, options.context, subjectRef);
+	const field = getFieldConfig<Type>(options.formId, context, {
+		name: options.name,
+		subjectRef,
+	});
 
 	return field;
 }

@@ -12,7 +12,12 @@ export {
 	type Primitive,
 	type DefaultValue,
 } from './types.js';
-export { type FormContext, type Form, createForm } from './form.js';
+export {
+	type FormContext,
+	type Form,
+	type SubscriptionSubject,
+	createForm,
+} from './form.js';
 export { isFieldElement } from './dom.js';
 export { invariant } from './util.js';
 export {

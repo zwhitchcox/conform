@@ -1,4 +1,4 @@
-import { flatten, getFormData } from './formdata.js';
+import { flatten, getFormData, getValidationMessage } from './formdata.js';
 import {
 	isFieldElement,
 	getFormAction,
@@ -34,6 +34,12 @@ export interface FormOptions<Type> {
 	onValidate?: (context: SubmissionContext) => Submission<Type>;
 }
 
+export interface SubscriptionSubject {
+	error?: boolean | Record<string, boolean>;
+	validated?: boolean | Record<string, boolean>;
+	key?: boolean | Record<string, boolean>;
+}
+
 export interface Form<Type extends Record<string, unknown> = any> {
 	id: string;
 	submit(event: SubmitEvent): void;
@@ -42,7 +48,10 @@ export interface Form<Type extends Record<string, unknown> = any> {
 	blur(event: Event): void;
 	report(result: SubmissionResult): void;
 	update(options: Omit<FormOptions<Type>, 'lastResult'>): void;
-	subscribe(callback: () => void): () => void;
+	subscribe(
+		callback: () => void,
+		getSubject?: () => SubscriptionSubject | undefined,
+	): () => void;
 	getContext(): FormContext;
 }
 
@@ -52,7 +61,10 @@ export function createForm<Type extends Record<string, unknown> = any>(
 ): Form<Type> {
 	const metadata: FormMetadata = initializeMetadata(options);
 
-	let listeners: Array<() => void> = [];
+	let subscribers: Array<{
+		callback: () => void;
+		getSubject: () => SubscriptionSubject;
+	}> = [];
 	let latestOptions = options;
 	let context: FormContext = {
 		metadata,
@@ -77,11 +89,76 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		};
 	}
 
-	function updateContext(update: FormContext) {
-		context = update;
+	function shouldNotify<Type>(options: {
+		prev: Record<string, Type>;
+		next: Record<string, Type>;
+		compareFn: (prev: Type | undefined, next: Type | undefined) => boolean;
+		cache: Record<string, boolean>;
+		scope: true | Record<string, boolean>;
+	}): boolean {
+		const names =
+			typeof options.scope !== 'boolean'
+				? Object.keys(options.scope)
+				: [...Object.keys(options.prev), ...Object.keys(options.next)];
 
-		for (const callback of listeners) {
-			callback();
+		for (const name of names) {
+			options.cache[name] ??= options.compareFn(
+				options.prev[name],
+				options.next[name],
+			);
+
+			if (options.cache[name]) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	function updateContext(next: FormContext) {
+		const diff: Record<keyof SubscriptionSubject, Record<string, boolean>> = {
+			error: {},
+			validated: {},
+			key: {},
+		};
+		const prev = context;
+
+		// Apply change before notifying subscribers
+		context = next;
+
+		for (const subscriber of subscribers) {
+			const subject = subscriber.getSubject();
+
+			if (
+				(subject.error &&
+					shouldNotify({
+						prev: prev.error,
+						next: next.error,
+						compareFn: (prev, next) =>
+							getValidationMessage(prev) !== getValidationMessage(next),
+						cache: diff.error,
+						scope: subject.error,
+					})) ||
+				(subject.validated &&
+					shouldNotify({
+						prev: prev.state.validated,
+						next: next.state.validated,
+						compareFn: (prev, next) => (prev ?? false) !== (next ?? false),
+						cache: diff.validated,
+						scope: subject.validated,
+					})) ||
+				(subject.key &&
+					shouldNotify({
+						prev: prev.state.listKeys,
+						next: next.state.listKeys,
+						compareFn: (prev, next) =>
+							getValidationMessage(prev) !== getValidationMessage(next),
+						cache: diff.key,
+						scope: subject.key,
+					}))
+			) {
+				subscriber.callback();
+			}
 		}
 	}
 
@@ -233,11 +310,19 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		latestOptions = options;
 	}
 
-	function subscribe(callback: () => void) {
-		listeners.push(callback);
+	function subscribe(
+		callback: () => void,
+		getSubject?: () => SubscriptionSubject | undefined,
+	) {
+		const subscriber = {
+			callback,
+			getSubject: () => getSubject?.() ?? {},
+		};
+
+		subscribers.push(subscriber);
 
 		return () => {
-			listeners = listeners.filter((listener) => listener !== callback);
+			subscribers = subscribers.filter((current) => current !== subscriber);
 		};
 	}
 
