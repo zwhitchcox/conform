@@ -37,7 +37,7 @@ export interface BaseConfig {
 	id: string;
 	errorId: string;
 	descriptionId: string;
-	invalid: boolean;
+	valid: boolean;
 }
 
 export interface Options<Type> {
@@ -134,8 +134,15 @@ export function ConformBoundary(props: { context: Form; children: ReactNode }) {
 	);
 }
 
-export function FormStateInput(props: { formId: string }): React.ReactElement {
-	const context = useFormContext(props.formId);
+export function FormStateInput(props: {
+	formId: string;
+	context?: Form;
+}): React.ReactElement {
+	const subjectRef = useRef({
+		validated: true,
+		key: true,
+	});
+	const context = useFormContext(props.formId, props.context, subjectRef);
 
 	return createElement('input', {
 		type: 'hidden',
@@ -191,20 +198,22 @@ export function getFieldConfig<Type>(
 			name,
 			defaultValue: context.initialValue[name] as DefaultValue<Type>,
 			constraint: context.metadata.constraint[name] ?? {},
-			invalid: errors.length > 0,
+			valid: errors.length === 0,
 			errors,
 		},
 		{
-			get(target, prop) {
-				switch (prop) {
+			get(target, key, receiver) {
+				switch (key) {
 					case 'errors':
-					case 'invalid':
+					case 'valid':
 						options.subjectRef.current.error[name] = true;
+						break;
+					case 'defaultValue':
+						options.subjectRef.current.defaultValue[name] = true;
 						break;
 				}
 
-				// @ts-expect-error It's fine
-				return target[prop];
+				return Reflect.get(target, key, receiver);
 			},
 		},
 	);
@@ -305,7 +314,7 @@ export function useForm<
 			onSubmit,
 			onReset,
 			noValidate,
-			invalid: errors.length > 0,
+			valid: errors.length === 0,
 		},
 		context: form,
 		errors,
@@ -396,6 +405,7 @@ export function useFieldList<Item>(
 
 const defaultSubject: Subject = {
 	error: {},
+	defaultValue: {},
 	validated: {},
 	key: {},
 };

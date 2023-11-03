@@ -34,11 +34,11 @@ export interface FormOptions<Type> {
 	onValidate?: (context: SubmissionContext) => Submission<Type>;
 }
 
-export interface SubscriptionSubject {
-	error?: boolean | Record<string, boolean>;
-	validated?: boolean | Record<string, boolean>;
-	key?: boolean | Record<string, boolean>;
-}
+export type SubscriptionSubject = {
+	[key in 'error' | 'defaultValue' | 'key' | 'validated']?:
+		| boolean
+		| Record<string, boolean>;
+};
 
 export interface Form<Type extends Record<string, unknown> = any> {
 	id: string;
@@ -118,8 +118,9 @@ export function createForm<Type extends Record<string, unknown> = any>(
 	function updateContext(next: FormContext) {
 		const diff: Record<keyof SubscriptionSubject, Record<string, boolean>> = {
 			error: {},
-			validated: {},
+			defaultValue: {},
 			key: {},
+			validated: {},
 		};
 		const prev = context;
 
@@ -139,14 +140,6 @@ export function createForm<Type extends Record<string, unknown> = any>(
 						cache: diff.error,
 						scope: subject.error,
 					})) ||
-				(subject.validated &&
-					shouldNotify({
-						prev: prev.state.validated,
-						next: next.state.validated,
-						compareFn: (prev, next) => (prev ?? false) !== (next ?? false),
-						cache: diff.validated,
-						scope: subject.validated,
-					})) ||
 				(subject.key &&
 					shouldNotify({
 						prev: prev.state.listKeys,
@@ -155,6 +148,22 @@ export function createForm<Type extends Record<string, unknown> = any>(
 							getValidationMessage(prev) !== getValidationMessage(next),
 						cache: diff.key,
 						scope: subject.key,
+					})) ||
+				(subject.defaultValue &&
+					shouldNotify({
+						prev: prev.metadata.defaultValue,
+						next: next.metadata.defaultValue,
+						compareFn: (prev, next) => prev !== next,
+						cache: diff.defaultValue,
+						scope: subject.defaultValue,
+					})) ||
+				(subject.validated &&
+					shouldNotify({
+						prev: prev.state.validated,
+						next: next.state.validated,
+						compareFn: (prev, next) => (prev ?? false) !== (next ?? false),
+						cache: diff.validated,
+						scope: subject.validated,
 					}))
 			) {
 				subscriber.callback();
