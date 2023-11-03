@@ -188,7 +188,7 @@ export const list = createIntent<
 		};
 	},
 	update(result, payload, { defaultListKeys }) {
-		const keys = result.state.listKeys[payload.name] ?? defaultListKeys;
+		const keys = result.state.key[payload.name] ?? defaultListKeys;
 
 		switch (payload.operation) {
 			case 'append':
@@ -209,7 +209,7 @@ export const list = createIntent<
 				break;
 		}
 
-		result.state.listKeys[payload.name] = keys;
+		result.state.key[payload.name] = keys;
 		result.state.validated[payload.name] = true;
 	},
 });

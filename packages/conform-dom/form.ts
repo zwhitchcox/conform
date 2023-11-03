@@ -75,7 +75,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		error: options.lastResult?.error ?? {},
 		state: options.lastResult?.state ?? {
 			validated: {},
-			listKeys: {},
+			key: {},
 		},
 	};
 
@@ -146,8 +146,8 @@ export function createForm<Type extends Record<string, unknown> = any>(
 					})) ||
 				(subject.key &&
 					shouldNotify({
-						prev: prev.state.listKeys,
-						next: next.state.listKeys,
+						prev: prev.state.key,
+						next: next.state.key,
 						compareFn: (prev, next) =>
 							getValidationMessage(prev) !== getValidationMessage(next),
 						cache: diff.key,
@@ -327,7 +327,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			error: {},
 			state: {
 				validated: {},
-				listKeys: {},
+				key: {},
 			},
 		});
 	}
@@ -347,7 +347,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			error: result.error ?? {},
 			state: result.state ?? {
 				validated: {},
-				listKeys: {},
+				key: {},
 			},
 		});
 

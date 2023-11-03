@@ -146,7 +146,7 @@ async function runValidationScenario(page: Page) {
 	// 			'items[1]': true,
 	// 			'items[2]': true,
 	// 		},
-	// 		listKeys: {
+	// 		key: {
 	// 			items: [expect.any(String), expect.any(String)]
 	// 		},
 	// 	},

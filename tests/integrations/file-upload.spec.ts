@@ -89,7 +89,7 @@ async function runValidationScenario(page: Page) {
 				file: true,
 				files: true,
 			},
-			listKeys: {},
+			key: {},
 		},
 	});
 }

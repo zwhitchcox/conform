@@ -54,7 +54,7 @@ export type FormMetadata = {
 
 export type FormState = {
 	validated: Record<string, boolean>;
-	listKeys: Record<string, Array<string>>;
+	key: Record<string, Array<string>>;
 };
 
 export type SubmissionContext = {

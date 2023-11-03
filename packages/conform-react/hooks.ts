@@ -379,7 +379,7 @@ export function useFieldList<Item>(
 	});
 	const context = useFormContext(options.formId, options.context, subjectRef);
 	const keys = useMemo(() => {
-		let keys = context.state.listKeys[options.name];
+		let keys = context.state.key[options.name];
 
 		if (!keys) {
 			const list = context.metadata.defaultValue[options.name] ?? [];
