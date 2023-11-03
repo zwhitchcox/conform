@@ -53,8 +53,10 @@ export type FormMetadata = {
 };
 
 export type FormState = {
-	validated: Record<string, boolean>;
 	key: Record<string, Array<string>>;
+	validated: Record<string, boolean>;
+	valid: Record<string, boolean>;
+	dirty: Record<string, boolean>;
 };
 
 export type SubmissionContext = {
@@ -98,5 +100,8 @@ export type SubmissionResult = {
 	status: 'updated' | 'failed' | 'accepted';
 	initialValue?: Record<string, string | string[]>;
 	error?: Record<string, string[]>;
-	state?: FormState;
+	state?: {
+		validated: FormState['validated'];
+		key: FormState['key'];
+	};
 };

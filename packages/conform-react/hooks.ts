@@ -38,6 +38,7 @@ export interface BaseConfig {
 	errorId: string;
 	descriptionId: string;
 	valid: boolean;
+	dirty: boolean;
 }
 
 export interface Options<Type> {
@@ -87,7 +88,7 @@ const FormContext = createContext<Record<string, Form>>({});
 export function useFormContext(
 	formId: string,
 	localContext?: Form | undefined,
-	subject?: MutableRefObject<SubscriptionSubject>,
+	subjectRef?: MutableRefObject<SubscriptionSubject>,
 ): FormContext {
 	const registry = useContext(FormContext);
 	const form = localContext ?? registry[formId];
@@ -97,8 +98,9 @@ export function useFormContext(
 	}
 
 	const subscribe = useCallback(
-		(callback: () => void) => form.subscribe(callback, () => subject?.current),
-		[form, subject],
+		(callback: () => void) =>
+			form.subscribe(callback, () => subjectRef?.current),
+		[form, subjectRef],
 	);
 	const context = useSyncExternalStore(
 		subscribe,
@@ -200,21 +202,21 @@ export function getFieldConfig<Type>(
 			defaultValue: context.initialValue[name] as DefaultValue<Type>,
 			value: context.value[name] as DefaultValue<Type>,
 			constraint: context.metadata.constraint[name] ?? {},
-			valid: errors.length === 0,
+			valid: context.state.valid[name] ?? false,
+			dirty: context.state.dirty[name] ?? false,
 			errors,
 		},
 		{
 			get(target, key, receiver) {
 				switch (key) {
 					case 'errors':
-					case 'valid':
 						options.subjectRef.current.error[name] = true;
 						break;
 					case 'defaultValue':
-						options.subjectRef.current.defaultValue[name] = true;
-						break;
 					case 'value':
-						options.subjectRef.current.value[name] = true;
+					case 'valid':
+					case 'dirty':
+						options.subjectRef.current[key][name] = true;
 						break;
 				}
 
@@ -226,7 +228,7 @@ export function getFieldConfig<Type>(
 
 export function useForm<
 	Type extends Record<string, any> = Record<string, any>,
->(config: {
+>(options: {
 	id?: string;
 	defaultValue?: DefaultValue<Type>;
 	lastResult?: SubmissionResult;
@@ -240,15 +242,15 @@ export function useForm<
 		formData,
 	}: SubmissionContext) => Submission<any>;
 }): FormResult<Type> {
-	const formId = useFormId(config.id);
+	const formId = useFormId(options.id);
 	const initializeForm = () =>
 		createForm(formId, {
-			defaultValue: config.defaultValue,
-			constraint: config.constraint,
-			lastResult: config.lastResult,
-			onValidate: config.onValidate,
-			shouldValidate: config.shouldValidate,
-			shouldRevalidate: config.shouldRevalidate,
+			defaultValue: options.defaultValue,
+			constraint: options.constraint,
+			lastResult: options.lastResult,
+			onValidate: options.onValidate,
+			shouldValidate: options.shouldValidate,
+			shouldRevalidate: options.shouldRevalidate,
 		});
 	const [form, setForm] = useState(initializeForm);
 
@@ -257,9 +259,9 @@ export function useForm<
 		setForm(initializeForm);
 	}
 
-	const noValidate = useNoValidate(config.defaultNoValidate);
-	const configRef = useRef(config);
-	const { errorId, descriptionId, errors } = useField<Type>({
+	const noValidate = useNoValidate(options.defaultNoValidate);
+	const optionsRef = useRef(options);
+	const config = useField<Type>({
 		formId,
 		context: form,
 		name: '',
@@ -270,26 +272,26 @@ export function useForm<
 	});
 
 	useEffect(() => {
-		if (config.lastResult === configRef.current.lastResult) {
+		if (options.lastResult === optionsRef.current.lastResult) {
 			// If there is no change, do nothing
 			return;
 		}
 
-		if (config.lastResult) {
-			form.report(config.lastResult);
+		if (options.lastResult) {
+			form.report(options.lastResult);
 		} else {
 			document.forms.namedItem(form.id)?.reset();
 		}
-	}, [form, config.lastResult]);
+	}, [form, options.lastResult]);
 
 	useEffect(() => {
-		configRef.current = config;
+		optionsRef.current = options;
 		form.update({
-			defaultValue: config.defaultValue,
-			constraint: config.constraint,
-			shouldValidate: config.shouldValidate,
-			shouldRevalidate: config.shouldRevalidate,
-			onValidate: config.onValidate,
+			defaultValue: options.defaultValue,
+			constraint: options.constraint,
+			shouldValidate: options.shouldValidate,
+			shouldRevalidate: options.shouldRevalidate,
+			onValidate: options.onValidate,
 		});
 	});
 
@@ -314,15 +316,22 @@ export function useForm<
 	return {
 		config: {
 			id: formId,
-			errorId,
-			descriptionId,
+			errorId: config.errorId,
+			descriptionId: config.descriptionId,
 			onSubmit,
 			onReset,
 			noValidate,
-			valid: errors.length === 0,
+			get dirty() {
+				return config.dirty;
+			},
+			get valid() {
+				return config.valid;
+			},
 		},
 		context: form,
-		errors,
+		get errors() {
+			return config.errors;
+		},
 		fields,
 	};
 }
@@ -408,18 +417,19 @@ export function useFieldList<Item>(
 	});
 }
 
-const defaultSubject: Subject = {
-	value: {},
-	error: {},
-	defaultValue: {},
-	validated: {},
-	key: {},
-};
-
 export function useSubjectRef(
 	initialSubject?: Partial<Subject>,
 ): MutableRefObject<Subject> {
-	const subjectRef = useRef<Subject>(defaultSubject);
+	const defaultSubject: Subject = {
+		value: {},
+		error: {},
+		defaultValue: {},
+		validated: {},
+		key: {},
+		valid: {},
+		dirty: {},
+	};
+	const subjectRef = useRef(defaultSubject);
 
 	// Reset the subject everytime the component is rerendered
 	// This let us subscribe to data used in the last render only

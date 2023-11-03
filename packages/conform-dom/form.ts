@@ -37,9 +37,14 @@ export interface FormOptions<Type> {
 }
 
 export type SubscriptionSubject = {
-	[key in 'error' | 'defaultValue' | 'value' | 'key' | 'validated']?:
-		| boolean
-		| Record<string, boolean>;
+	[key in
+		| 'error'
+		| 'defaultValue'
+		| 'value'
+		| 'key'
+		| 'validated'
+		| 'valid'
+		| 'dirty']?: boolean | Record<string, boolean>;
 };
 
 export interface Form<Type extends Record<string, unknown> = any> {
@@ -61,28 +66,67 @@ export function createForm<Type extends Record<string, unknown> = any>(
 	formId: string,
 	options: FormOptions<Type>,
 ): Form<Type> {
-	const metadata: FormMetadata = initializeMetadata(options);
-
 	let subscribers: Array<{
 		callback: () => void;
 		getSubject: () => SubscriptionSubject;
 	}> = [];
 	let latestOptions = options;
-	let context: FormContext = {
-		metadata,
-		initialValue: options.lastResult?.initialValue ?? metadata.defaultValue,
-		value: options.lastResult?.initialValue ?? metadata.defaultValue,
-		error: options.lastResult?.error ?? {},
-		state: options.lastResult?.state ?? {
-			validated: {},
-			key: {},
-		},
-	};
+	let context = initializeFormContext();
 
 	function getFormElement(): HTMLFormElement {
 		const element = document.forms.namedItem(formId);
 		invariant(element !== null, `Form#${formId} does not exist`);
 		return element;
+	}
+
+	function initializeFormContext(): FormContext {
+		const metadata: FormMetadata = initializeMetadata(options);
+		const value = options.lastResult?.initialValue ?? metadata.defaultValue;
+		const error = options.lastResult?.error ?? {};
+
+		return {
+			metadata,
+			initialValue: value,
+			value,
+			error,
+			state: {
+				key: options.lastResult?.state?.key ?? {},
+				validated: options.lastResult?.state?.validated ?? {},
+				valid: createValidProxy(error),
+				dirty: createDirtyProxy(metadata.defaultValue, value),
+			},
+		};
+	}
+
+	function createValidProxy(
+		error: Record<string, string[]>,
+	): Record<string, boolean> {
+		return new Proxy(
+			{},
+			{
+				get(_, name: string) {
+					const messages = error[name] ?? [];
+
+					return messages.length === 0;
+				},
+			},
+		);
+	}
+
+	function createDirtyProxy(
+		defaultValue: Record<string, unknown>,
+		value: Record<string, unknown>,
+	): Record<string, boolean> {
+		return new Proxy(
+			{},
+			{
+				get(_, name: string) {
+					return (
+						JSON.stringify(defaultValue[name]) !== JSON.stringify(value[name])
+					);
+				},
+			},
+		);
 	}
 
 	function initializeMetadata(options: FormOptions<Type>): FormMetadata {
@@ -92,7 +136,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		};
 	}
 
-	function shouldNotify<Type>(options: {
+	function shouldNotify<Type>(config: {
 		prev: Record<string, Type>;
 		next: Record<string, Type>;
 		compareFn: (prev: Type | undefined, next: Type | undefined) => boolean;
@@ -100,17 +144,17 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		scope: true | Record<string, boolean>;
 	}): boolean {
 		const names =
-			typeof options.scope !== 'boolean'
-				? Object.keys(options.scope)
-				: [...Object.keys(options.prev), ...Object.keys(options.next)];
+			typeof config.scope !== 'boolean'
+				? Object.keys(config.scope)
+				: [...Object.keys(config.prev), ...Object.keys(config.next)];
 
 		for (const name of names) {
-			options.cache[name] ??= options.compareFn(
-				options.prev[name],
-				options.next[name],
+			config.cache[name] ??= config.compareFn(
+				config.prev[name],
+				config.next[name],
 			);
 
-			if (options.cache[name]) {
+			if (config.cache[name]) {
 				return true;
 			}
 		}
@@ -118,15 +162,25 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		return false;
 	}
 
-	function updateContext(next: FormContext) {
+	function updateContext(update: FormContext) {
 		const diff: Record<keyof SubscriptionSubject, Record<string, boolean>> = {
 			value: {},
 			error: {},
 			defaultValue: {},
 			key: {},
 			validated: {},
+			valid: {},
+			dirty: {},
 		};
 		const prev = context;
+		const next = {
+			...update,
+			state: {
+				...update.state,
+				valid: createValidProxy(update.error),
+				dirty: createDirtyProxy(update.metadata.defaultValue, update.value),
+			},
+		};
 
 		// Apply change before notifying subscribers
 		context = next;
@@ -144,6 +198,14 @@ export function createForm<Type extends Record<string, unknown> = any>(
 						cache: diff.error,
 						scope: subject.error,
 					})) ||
+				(subject.defaultValue &&
+					shouldNotify({
+						prev: prev.metadata.defaultValue,
+						next: next.metadata.defaultValue,
+						compareFn: (prev, next) => prev !== next,
+						cache: diff.defaultValue,
+						scope: subject.defaultValue,
+					})) ||
 				(subject.key &&
 					shouldNotify({
 						prev: prev.state.key,
@@ -153,13 +215,21 @@ export function createForm<Type extends Record<string, unknown> = any>(
 						cache: diff.key,
 						scope: subject.key,
 					})) ||
-				(subject.defaultValue &&
+				(subject.valid &&
 					shouldNotify({
-						prev: prev.metadata.defaultValue,
-						next: next.metadata.defaultValue,
+						prev: prev.state.valid,
+						next: next.state.valid,
 						compareFn: (prev, next) => prev !== next,
-						cache: diff.defaultValue,
-						scope: subject.defaultValue,
+						cache: diff.valid,
+						scope: subject.valid,
+					})) ||
+				(subject.dirty &&
+					shouldNotify({
+						prev: prev.state.dirty,
+						next: next.state.dirty,
+						compareFn: (prev, next) => prev !== next,
+						cache: diff.dirty,
+						scope: subject.dirty,
 					})) ||
 				(subject.value &&
 					shouldNotify({
@@ -328,6 +398,8 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			state: {
 				validated: {},
 				key: {},
+				valid: {},
+				dirty: {},
 			},
 		});
 	}
@@ -345,9 +417,10 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			initialValue: result.initialValue,
 			value: result.initialValue,
 			error: result.error ?? {},
-			state: result.state ?? {
-				validated: {},
-				key: {},
+			state: {
+				...context.state,
+				key: result.state?.key ?? {},
+				validated: result.state?.validated ?? {},
 			},
 		});
 
