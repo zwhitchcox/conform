@@ -7,6 +7,7 @@ import {
 	focusFirstInvalidField,
 } from './dom.js';
 import type {
+	FieldElement,
 	FormMetadata,
 	Submission,
 	SubmissionContext,
@@ -16,11 +17,12 @@ import type {
 	Constraint,
 } from './types.js';
 import { invariant } from './util.js';
-import { requestIntent, validate } from './intent.js';
+import { requestIntent, resolve, validate } from './intent.js';
 
 export interface FormContext {
 	metadata: FormMetadata;
 	initialValue: Record<string, unknown>;
+	value: Record<string, unknown>;
 	error: Record<string, string[]>;
 	state: FormState;
 }
@@ -35,7 +37,7 @@ export interface FormOptions<Type> {
 }
 
 export type SubscriptionSubject = {
-	[key in 'error' | 'defaultValue' | 'key' | 'validated']?:
+	[key in 'error' | 'defaultValue' | 'value' | 'key' | 'validated']?:
 		| boolean
 		| Record<string, boolean>;
 };
@@ -69,6 +71,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 	let context: FormContext = {
 		metadata,
 		initialValue: options.lastResult?.initialValue ?? metadata.defaultValue,
+		value: options.lastResult?.initialValue ?? metadata.defaultValue,
 		error: options.lastResult?.error ?? {},
 		state: options.lastResult?.state ?? {
 			validated: {},
@@ -117,6 +120,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 
 	function updateContext(next: FormContext) {
 		const diff: Record<keyof SubscriptionSubject, Record<string, boolean>> = {
+			value: {},
 			error: {},
 			defaultValue: {},
 			key: {},
@@ -156,6 +160,15 @@ export function createForm<Type extends Record<string, unknown> = any>(
 						compareFn: (prev, next) => prev !== next,
 						cache: diff.defaultValue,
 						scope: subject.defaultValue,
+					})) ||
+				(subject.value &&
+					shouldNotify({
+						prev: prev.value,
+						next: next.value,
+						compareFn: (prev, next) =>
+							JSON.stringify(prev) !== JSON.stringify(next),
+						cache: diff.value,
+						scope: subject.value,
 					})) ||
 				(subject.validated &&
 					shouldNotify({
@@ -232,7 +245,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		return result;
 	}
 
-	function validateField(eventName: string, event: Event): void {
+	function resolveTarget(event: Event) {
 		const form = getFormElement();
 		const element = event.target;
 
@@ -242,9 +255,16 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			element.name === '' ||
 			event.defaultPrevented
 		) {
-			return;
+			return null;
 		}
 
+		return element;
+	}
+
+	function validateField(
+		element: FieldElement,
+		eventName: 'onInput' | 'onBlur',
+	): void {
 		const { shouldValidate = 'onSubmit', shouldRevalidate = shouldValidate } =
 			latestOptions;
 		const validated = context.state.validated[element.name];
@@ -252,11 +272,39 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		if (
 			validated ? shouldRevalidate === eventName : shouldValidate === eventName
 		) {
-			requestIntent(form, {
+			requestIntent(element.form, {
 				value: validate.serialize(element.name),
 				formNoValidate: true,
 			});
 		}
+	}
+
+	function input(event: Event) {
+		const element = resolveTarget(event);
+
+		if (!element || !element.form) {
+			return;
+		}
+
+		validateField(element, 'onInput');
+
+		const formData = new FormData(element.form);
+		const result = resolve(formData);
+
+		updateContext({
+			...context,
+			value: flatten(result.data),
+		});
+	}
+
+	function blur(event: Event) {
+		const element = resolveTarget(event);
+
+		if (!element) {
+			return;
+		}
+
+		validateField(element, 'onBlur');
 	}
 
 	function reset(event: Event) {
@@ -275,6 +323,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		updateContext({
 			metadata,
 			initialValue: metadata.defaultValue,
+			value: metadata.defaultValue,
 			error: {},
 			state: {
 				validated: {},
@@ -292,8 +341,9 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		}
 
 		updateContext({
-			metadata: context.metadata,
+			...context,
 			initialValue: result.initialValue,
+			value: result.initialValue,
 			error: result.error ?? {},
 			state: result.state ?? {
 				validated: {},
@@ -343,8 +393,8 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		id: formId,
 		submit,
 		reset,
-		input: validateField.bind(null, 'onInput'),
-		blur: validateField.bind(null, 'onBlur'),
+		input,
+		blur,
 		report,
 		update,
 		subscribe,

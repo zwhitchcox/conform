@@ -72,6 +72,7 @@ export interface FieldConfig<Type> extends BaseConfig {
 	formId: string;
 	name: FieldName<Type>;
 	defaultValue: DefaultValue<Type>;
+	value: DefaultValue<Type>;
 	constraint: Constraint;
 	errors: string[];
 }
@@ -197,6 +198,7 @@ export function getFieldConfig<Type>(
 			descriptionId: `${id}-description`,
 			name,
 			defaultValue: context.initialValue[name] as DefaultValue<Type>,
+			value: context.value[name] as DefaultValue<Type>,
 			constraint: context.metadata.constraint[name] ?? {},
 			valid: errors.length === 0,
 			errors,
@@ -210,6 +212,9 @@ export function getFieldConfig<Type>(
 						break;
 					case 'defaultValue':
 						options.subjectRef.current.defaultValue[name] = true;
+						break;
+					case 'value':
+						options.subjectRef.current.value[name] = true;
 						break;
 				}
 
@@ -404,6 +409,7 @@ export function useFieldList<Item>(
 }
 
 const defaultSubject: Subject = {
+	value: {},
 	error: {},
 	defaultValue: {},
 	validated: {},

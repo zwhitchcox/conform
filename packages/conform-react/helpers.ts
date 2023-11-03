@@ -96,10 +96,10 @@ function getAriaAttributes<Config extends BaseConfig>(
 
 	return cleanup({
 		'aria-invalid':
-			(hasAriaAttributes && config.errorId && config.invalid) || undefined,
+			(hasAriaAttributes && config.errorId && !config.valid) || undefined,
 		'aria-describedby': hasAriaAttributes
 			? [
-					config.errorId && config.invalid ? config.errorId : undefined,
+					config.errorId && !config.valid ? config.errorId : undefined,
 					config.descriptionId &&
 					options.ariaAttributes !== false &&
 					options.description
