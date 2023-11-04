@@ -33,6 +33,45 @@ function getError({ errors }: ZodError): Record<string, string[]> {
 	}, {});
 }
 
+function cleanup(value: unknown): unknown {
+	if (isPlainObject(value)) {
+		const obj = Object.entries(value).reduce<Record<string, unknown>>(
+			(result, [key, value]) => {
+				if (typeof value !== 'undefined') {
+					const data = cleanup(value);
+
+					if (typeof data !== 'undefined') {
+						result[key] = data;
+					}
+				}
+
+				return result;
+			},
+			{},
+		);
+
+		if (Object.keys(obj).length === 0) {
+			return;
+		}
+
+		return obj;
+	}
+
+	if (Array.isArray(value)) {
+		if (value.length === 0) {
+			return undefined;
+		}
+
+		return value.map(cleanup);
+	}
+
+	if (value instanceof File || value === null) {
+		return undefined;
+	}
+
+	return value;
+}
+
 interface SubmissionContext<Value> {
 	initialValue: Record<string, string | string[]>;
 	value: Value | null;
@@ -168,16 +207,7 @@ export function parse<Schema extends ZodTypeAny>(
 		const error = !result.success ? getError(result.error) : {};
 		const initialValue = flatten(context.data, {
 			resolve(data) {
-				// File cannot be serialized
-				if (data instanceof File || isPlainObject(data)) {
-					return null;
-				} else if (typeof data === 'string') {
-					return data;
-				} else if (Array.isArray(data)) {
-					return data.map((item) => (item instanceof File ? null : item));
-				}
-
-				throw new Error(`Invalid value: ${data}`);
+				return cleanup(data);
 			},
 		}) as Record<string, string | string[]>;
 		const state = context.state;

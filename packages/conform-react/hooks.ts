@@ -151,7 +151,10 @@ export function FormStateInput(props: {
 		type: 'hidden',
 		form: props.formId,
 		name: '__state__',
-		value: JSON.stringify(context.state),
+		value: JSON.stringify({
+			key: context.state.key,
+			validated: context.state.validated,
+		}),
 	});
 }
 
@@ -202,8 +205,12 @@ export function getFieldConfig<Type>(
 			defaultValue: context.initialValue[name] as DefaultValue<Type>,
 			value: context.value[name] as DefaultValue<Type>,
 			constraint: context.metadata.constraint[name] ?? {},
-			valid: context.state.valid[name] ?? false,
-			dirty: context.state.dirty[name] ?? false,
+			get valid() {
+				return context.state.valid[name] ?? false;
+			},
+			get dirty() {
+				return context.state.dirty[name] ?? false;
+			},
 			errors,
 		},
 		{

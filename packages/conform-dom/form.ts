@@ -105,9 +105,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			{},
 			{
 				get(_, name: string) {
-					const messages = error[name] ?? [];
-
-					return messages.length === 0;
+					return (error[name] ?? []).length === 0;
 				},
 			},
 		);
