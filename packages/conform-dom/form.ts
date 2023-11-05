@@ -44,7 +44,12 @@ export type SubscriptionSubject = {
 		| 'key'
 		| 'validated'
 		| 'valid'
-		| 'dirty']?: boolean | Record<string, boolean>;
+		| 'dirty']?: SubscriptionScope;
+};
+
+export type SubscriptionScope = {
+	parent?: string[];
+	name?: string[];
 };
 
 export interface Form<Type extends Record<string, unknown> = any> {
@@ -68,7 +73,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 ): Form<Type> {
 	let subscribers: Array<{
 		callback: () => void;
-		getSubject: () => SubscriptionSubject;
+		getSubject?: () => SubscriptionSubject | undefined;
 	}> = [];
 	let latestOptions = options;
 	let context = initializeFormContext();
@@ -81,7 +86,9 @@ export function createForm<Type extends Record<string, unknown> = any>(
 
 	function initializeFormContext(): FormContext {
 		const metadata: FormMetadata = initializeMetadata(options);
-		const value = options.lastResult?.initialValue ?? metadata.defaultValue;
+		const value = options.lastResult?.initialValue
+			? flatten(options.lastResult.initialValue)
+			: metadata.defaultValue;
 		const error = options.lastResult?.error ?? {};
 
 		return {
@@ -142,21 +149,33 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		next: Record<string, Type>;
 		compareFn: (prev: Type | undefined, next: Type | undefined) => boolean;
 		cache: Record<string, boolean>;
-		scope: true | Record<string, boolean>;
+		scope: SubscriptionScope;
 	}): boolean {
-		const names =
-			typeof config.scope !== 'boolean'
-				? Object.keys(config.scope)
-				: [...Object.keys(config.prev), ...Object.keys(config.next)];
+		const parents = config.scope.parent ?? [];
+		const names = config.scope.name ?? [];
+		const list =
+			parents.length === 0
+				? names
+				: Array.from(
+						new Set([...Object.keys(config.prev), ...Object.keys(config.next)]),
+				  );
 
-		for (const name of names) {
-			config.cache[name] ??= config.compareFn(
-				config.prev[name],
-				config.next[name],
-			);
+		for (const name of list) {
+			if (
+				parents.length === 0 ||
+				names.includes(name) ||
+				parents.includes(name) ||
+				parents.some((parent) => name.startsWith(`${parent}.`)) ||
+				parents.some((parent) => name.startsWith(`${parent}[`))
+			) {
+				config.cache[name] ??= config.compareFn(
+					config.prev[name],
+					config.next[name],
+				);
 
-			if (config.cache[name]) {
-				return true;
+				if (config.cache[name]) {
+					return true;
+				}
 			}
 		}
 
@@ -187,9 +206,10 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		context = next;
 
 		for (const subscriber of subscribers) {
-			const subject = subscriber.getSubject();
+			const subject = subscriber.getSubject?.();
 
 			if (
+				!subject ||
 				(subject.error &&
 					shouldNotify({
 						prev: prev.error,
@@ -323,8 +343,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		if (
 			!isFieldElement(element) ||
 			element.form !== form ||
-			element.name === '' ||
-			event.defaultPrevented
+			element.name === ''
 		) {
 			return null;
 		}
@@ -332,22 +351,17 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		return element;
 	}
 
-	function validateField(
+	function willValidate(
 		element: FieldElement,
 		eventName: 'onInput' | 'onBlur',
-	): void {
+	): boolean {
 		const { shouldValidate = 'onSubmit', shouldRevalidate = shouldValidate } =
 			latestOptions;
 		const validated = context.state.validated[element.name];
 
-		if (
-			validated ? shouldRevalidate === eventName : shouldValidate === eventName
-		) {
-			requestIntent(element.form, {
-				value: validate.serialize(element.name),
-				formNoValidate: true,
-			});
-		}
+		return validated
+			? shouldRevalidate === eventName
+			: shouldValidate === eventName;
 	}
 
 	function input(event: Event) {
@@ -357,25 +371,37 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			return;
 		}
 
-		validateField(element, 'onInput');
+		if (event.defaultPrevented || !willValidate(element, 'onInput')) {
+			const formData = new FormData(element.form);
+			const result = resolve(formData);
 
-		const formData = new FormData(element.form);
-		const result = resolve(formData);
-
-		updateContext({
-			...context,
-			value: flatten(result.data),
-		});
+			updateContext({
+				...context,
+				value: flatten(result.data),
+			});
+		} else {
+			requestIntent(element.form, {
+				value: validate.serialize(element.name),
+				formNoValidate: true,
+			});
+		}
 	}
 
 	function blur(event: Event) {
 		const element = resolveTarget(event);
 
-		if (!element) {
+		if (
+			!element ||
+			event.defaultPrevented ||
+			!willValidate(element, 'onBlur')
+		) {
 			return;
 		}
 
-		validateField(element, 'onBlur');
+		requestIntent(element.form, {
+			value: validate.serialize(element.name),
+			formNoValidate: true,
+		});
 	}
 
 	function reset(event: Event) {
@@ -413,10 +439,12 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			return;
 		}
 
+		const value = flatten(result.initialValue);
+
 		updateContext({
 			...context,
-			initialValue: result.initialValue,
-			value: result.initialValue,
+			initialValue: value,
+			value,
 			error: result.error ?? {},
 			state: {
 				...context.state,
@@ -449,7 +477,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 	) {
 		const subscriber = {
 			callback,
-			getSubject: () => getSubject?.() ?? {},
+			getSubject,
 		};
 
 		subscribers.push(subscriber);

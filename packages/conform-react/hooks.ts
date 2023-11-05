@@ -56,6 +56,7 @@ export interface FormConfig extends BaseConfig {
 export interface FormResult<Type extends Record<string, unknown>> {
 	context: Form<Type>;
 	errors: string[];
+	fieldErrors: Record<string, string[]>;
 	config: FormConfig;
 	fields: FieldsetConfig<Type>;
 }
@@ -76,12 +77,8 @@ export interface FieldConfig<Type> extends BaseConfig {
 	value: DefaultValue<Type>;
 	constraint: Constraint;
 	errors: string[];
+	fieldErrors: Record<string, string[]>;
 }
-
-export type Subject = Record<
-	keyof SubscriptionSubject,
-	Record<string, boolean>
->;
 
 const FormContext = createContext<Record<string, Form>>({});
 
@@ -141,9 +138,13 @@ export function FormStateInput(props: {
 	formId: string;
 	context?: Form;
 }): React.ReactElement {
-	const subjectRef = useRef({
-		validated: true,
-		key: true,
+	const subjectRef = useSubjectRef({
+		validated: {
+			parent: [''],
+		},
+		key: {
+			parent: [''],
+		},
 	});
 	const context = useFormContext(props.formId, props.context, subjectRef);
 
@@ -168,8 +169,13 @@ export function useNoValidate(defaultNoValidate = true): boolean {
 	const [noValidate, setNoValidate] = useState(defaultNoValidate);
 
 	useEffect(() => {
-		setNoValidate(true);
-	}, []);
+		// This is necessary to fix an issue in strict mode with related to our proxy setup
+		// It avoids the component from being rerendered without re-rendering the child
+		// Which reset the proxy but failed to capture its usage within child component
+		if (!noValidate) {
+			setNoValidate(true);
+		}
+	}, [noValidate]);
 
 	return noValidate;
 }
@@ -187,7 +193,7 @@ export function getFieldConfig<Type>(
 	options: {
 		name?: string;
 		key?: string;
-		subjectRef: MutableRefObject<Subject>;
+		subjectRef: MutableRefObject<SubscriptionSubject>;
 	},
 ): FieldConfig<Type> {
 	const name = options.name ?? '';
@@ -211,19 +217,52 @@ export function getFieldConfig<Type>(
 			get dirty() {
 				return context.state.dirty[name] ?? false;
 			},
+			get fieldErrors() {
+				if (name === '') {
+					return context.error;
+				}
+
+				const result: Record<string, string[]> = {};
+
+				for (const [key, errors] of Object.entries(context.error)) {
+					if (
+						key === name ||
+						key.startsWith(`${name}.`) ||
+						key.startsWith(`${name}[`)
+					) {
+						result[key] = errors;
+					}
+				}
+
+				return result;
+			},
 			errors,
 		},
 		{
 			get(target, key, receiver) {
 				switch (key) {
 					case 'errors':
-						options.subjectRef.current.error[name] = true;
+						options.subjectRef.current.error = {
+							...options.subjectRef.current.error,
+							name: (options.subjectRef.current.error?.name ?? []).concat(name),
+						};
+						break;
+					case 'fieldErrors':
+						options.subjectRef.current.error = {
+							...options.subjectRef.current.error,
+							parent: (options.subjectRef.current.error?.parent ?? []).concat(
+								name,
+							),
+						};
 						break;
 					case 'defaultValue':
 					case 'value':
 					case 'valid':
 					case 'dirty':
-						options.subjectRef.current[key][name] = true;
+						options.subjectRef.current[key] = {
+							...options.subjectRef.current[key],
+							name: (options.subjectRef.current[key]?.name ?? []).concat(name),
+						};
 						break;
 				}
 
@@ -339,6 +378,9 @@ export function useForm<
 		get errors() {
 			return config.errors;
 		},
+		get fieldErrors() {
+			return config.fieldErrors;
+		},
 		fields,
 	};
 }
@@ -350,7 +392,7 @@ export function useFieldset<Type>(
 	const context = useFormContext(options.formId, options.context, subjectRef);
 
 	return new Proxy({} as any, {
-		get(_target, prop) {
+		get(target, prop, receiver) {
 			const getConfig = (key: string | number) => {
 				const name = getName(key, options.name);
 				const config = getFieldConfig(options.formId, context, {
@@ -376,7 +418,7 @@ export function useFieldset<Type>(
 				return getConfig(Number.isNaN(index) ? prop : index);
 			}
 
-			return;
+			return Reflect.get(target, prop, receiver);
 		},
 	});
 }
@@ -390,7 +432,7 @@ export function useFieldList<Item>(
 ): FieldListConfig<Item> {
 	const subjectRef = useSubjectRef({
 		key: {
-			[options.name]: true,
+			name: [options.name],
 		},
 	});
 	const context = useFormContext(options.formId, options.context, subjectRef);
@@ -425,25 +467,13 @@ export function useFieldList<Item>(
 }
 
 export function useSubjectRef(
-	initialSubject?: Partial<Subject>,
-): MutableRefObject<Subject> {
-	const defaultSubject: Subject = {
-		value: {},
-		error: {},
-		defaultValue: {},
-		validated: {},
-		key: {},
-		valid: {},
-		dirty: {},
-	};
-	const subjectRef = useRef(defaultSubject);
+	initialSubject: SubscriptionSubject = {},
+): MutableRefObject<SubscriptionSubject> {
+	const subjectRef = useRef(initialSubject);
 
 	// Reset the subject everytime the component is rerendered
 	// This let us subscribe to data used in the last render only
-	subjectRef.current = {
-		...defaultSubject,
-		...initialSubject,
-	};
+	subjectRef.current = initialSubject;
 
 	return subjectRef;
 }

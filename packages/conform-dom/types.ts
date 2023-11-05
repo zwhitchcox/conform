@@ -83,14 +83,14 @@ export type Submission<Output> =
 	| {
 			ready: false;
 			pending: boolean;
-			payload: Record<string, FormDataEntryValue | FormDataEntryValue[]>;
+			payload: Record<string, unknown>;
 			error: Record<string, string[]>;
 			reject(options?: RejectOptions): SubmissionResult;
 			accept(options?: AcceptOptions): SubmissionResult;
 	  }
 	| {
 			ready: true;
-			payload: Record<string, FormDataEntryValue | FormDataEntryValue[]>;
+			payload: Record<string, unknown>;
 			value: Output;
 			reject(options: RejectOptions): SubmissionResult;
 			accept(options?: AcceptOptions): SubmissionResult;
@@ -98,7 +98,7 @@ export type Submission<Output> =
 
 export type SubmissionResult = {
 	status: 'updated' | 'failed' | 'accepted';
-	initialValue?: Record<string, string | string[]>;
+	initialValue?: Record<string, unknown>;
 	error?: Record<string, string[]>;
 	state?: {
 		validated: FormState['validated'];

@@ -107,6 +107,52 @@ export function isPlainObject(
 	);
 }
 
+export function cleanup<Type extends Record<string, unknown>>(
+	value: Type,
+): Record<string, unknown> | undefined;
+export function cleanup<Type extends Array<unknown>>(
+	value: Type,
+): Array<unknown> | undefined;
+export function cleanup(value: unknown): unknown | undefined;
+export function cleanup<Type extends Record<string, unknown> | Array<unknown>>(
+	value: Type,
+): Record<string, unknown> | Array<unknown> | undefined {
+	if (isPlainObject(value)) {
+		const obj = Object.entries(value).reduce<Record<string, unknown>>(
+			(result, [key, value]) => {
+				const data = cleanup(value);
+
+				if (typeof data !== 'undefined') {
+					result[key] = data;
+				}
+
+				return result;
+			},
+			{},
+		);
+
+		if (Object.keys(obj).length === 0) {
+			return;
+		}
+
+		return obj;
+	}
+
+	if (Array.isArray(value)) {
+		if (value.length === 0) {
+			return undefined;
+		}
+
+		return value.map(cleanup);
+	}
+
+	if (value instanceof File || value === null) {
+		return;
+	}
+
+	return value;
+}
+
 export function flatten(
 	data: Record<string | number | symbol, unknown> | Array<unknown> | undefined,
 	options?: {
@@ -115,7 +161,7 @@ export function flatten(
 	},
 ): Record<string, unknown> {
 	const result: Record<string, unknown> = {};
-	const resolve = options?.resolve ?? ((data) => data);
+	const resolve = options?.resolve ?? cleanup;
 
 	function setResult(data: unknown, name: string) {
 		const value = resolve(data);

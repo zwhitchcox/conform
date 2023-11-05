@@ -42,8 +42,6 @@ async function runValidationScenario(page: Page) {
 		initialValue: {
 			singleChoice: 'y',
 			multipleChoice: ['a', 'c'],
-			'multipleChoice[0]': 'a',
-			'multipleChoice[1]': 'c',
 		},
 		error: {},
 		state: {

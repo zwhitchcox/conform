@@ -2,11 +2,10 @@ import {
 	type FormState,
 	type Submission,
 	type SubmissionResult,
-	flatten,
 	formatPaths,
 	resolve,
 	getIntentHandler,
-	isPlainObject,
+	cleanup,
 } from '@conform-to/dom';
 import {
 	type IssueData,
@@ -33,47 +32,8 @@ function getError({ errors }: ZodError): Record<string, string[]> {
 	}, {});
 }
 
-function cleanup(value: unknown): unknown {
-	if (isPlainObject(value)) {
-		const obj = Object.entries(value).reduce<Record<string, unknown>>(
-			(result, [key, value]) => {
-				if (typeof value !== 'undefined') {
-					const data = cleanup(value);
-
-					if (typeof data !== 'undefined') {
-						result[key] = data;
-					}
-				}
-
-				return result;
-			},
-			{},
-		);
-
-		if (Object.keys(obj).length === 0) {
-			return;
-		}
-
-		return obj;
-	}
-
-	if (Array.isArray(value)) {
-		if (value.length === 0) {
-			return undefined;
-		}
-
-		return value.map(cleanup);
-	}
-
-	if (value instanceof File || value === null) {
-		return undefined;
-	}
-
-	return value;
-}
-
 interface SubmissionContext<Value> {
-	initialValue: Record<string, string | string[]>;
+	initialValue: Record<string, unknown>;
 	value: Value | null;
 	error: Record<string, string[]>;
 	state: FormState;
@@ -115,7 +75,7 @@ function createSubmission<Value>(
 
 				return {
 					status: context.pending ? 'updated' : 'failed',
-					initialValue: context.initialValue,
+					initialValue: cleanup(context.initialValue) ?? {},
 					error,
 					state: context.state,
 				};
@@ -127,7 +87,7 @@ function createSubmission<Value>(
 
 				return {
 					status: 'accepted',
-					initialValue: context.initialValue,
+					initialValue: cleanup(context.initialValue) ?? {},
 					error: context.error,
 					state: context.state,
 				};
@@ -142,7 +102,7 @@ function createSubmission<Value>(
 		reject(options) {
 			return {
 				status: 'failed',
-				initialValue: context.initialValue,
+				initialValue: cleanup(context.initialValue) ?? {},
 				error: constructError(options.formErrors, options.fieldErrors),
 				state: context.state,
 			};
@@ -154,7 +114,7 @@ function createSubmission<Value>(
 
 			return {
 				status: 'accepted',
-				initialValue: context.initialValue,
+				initialValue: cleanup(context.initialValue) ?? {},
 				error: context.error,
 				state: context.state,
 			};
@@ -205,11 +165,7 @@ export function parse<Schema extends ZodTypeAny>(
 		updateState: (result: Omit<Required<SubmissionResult>, 'status'>) => void,
 	): Submission<Output> => {
 		const error = !result.success ? getError(result.error) : {};
-		const initialValue = flatten(context.data, {
-			resolve(data) {
-				return cleanup(data);
-			},
-		}) as Record<string, string | string[]>;
+		const initialValue = context.data;
 		const state = context.state;
 
 		updateState({
