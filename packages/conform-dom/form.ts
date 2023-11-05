@@ -101,11 +101,13 @@ export function createForm<Type extends Record<string, unknown> = any>(
 	function createValidProxy(
 		error: Record<string, string[]>,
 	): Record<string, boolean> {
+		const cache: Record<string, boolean> = {};
+
 		return new Proxy(
 			{},
 			{
 				get(_, name: string) {
-					return (error[name] ?? []).length === 0;
+					return (cache[name] ??= (error[name] ?? []).length === 0);
 				},
 			},
 		);
@@ -115,13 +117,14 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		defaultValue: Record<string, unknown>,
 		value: Record<string, unknown>,
 	): Record<string, boolean> {
+		const cache: Record<string, boolean> = {};
+
 		return new Proxy(
 			{},
 			{
 				get(_, name: string) {
-					return (
-						JSON.stringify(defaultValue[name]) !== JSON.stringify(value[name])
-					);
+					return (cache[name] ??=
+						JSON.stringify(defaultValue[name]) !== JSON.stringify(value[name]));
 				},
 			},
 		);
