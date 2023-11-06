@@ -57,7 +57,7 @@ export default function FileUpload() {
 		<ConformBoundary context={form.context}>
 			<Form method="post" {...conform.form(form)} encType="multipart/form-data">
 				<Playground title="Employee Form" lastSubmission={lastResult}>
-					<Alert errors={form.errors} />
+					<Alert errors={form.error} />
 					<Field label="Single file" config={form.fields.file}>
 						<input {...conform.input(form.fields.file, { type: 'file' })} />
 					</Field>

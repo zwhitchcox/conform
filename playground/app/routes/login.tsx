@@ -72,7 +72,7 @@
 // 	return (
 // 		<Form method="post" {...form.props}>
 // 			<Playground title="Login Form" lastSubmission={lastSubmission}>
-// 				<Alert errors={form.errors} />
+// 				<Alert errors={form.error} />
 // 				<Field label="Email" config={email}>
 // 					<input
 // 						{...conform.input(email, { type: 'email' })}

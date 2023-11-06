@@ -41,7 +41,6 @@ async function runValidationScenario(page: Page) {
 			language: 'de',
 			tos: 'on',
 		},
-		error: {},
 		state: {
 			validated: {
 				language: true,

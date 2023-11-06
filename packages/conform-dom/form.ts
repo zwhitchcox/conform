@@ -120,7 +120,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			{},
 			{
 				get(_, name: string) {
-					return (cache[name] ??= (error[name] ?? []).length === 0);
+					return (cache[name] ??= typeof error[name] === 'undefined');
 				},
 			},
 		);
@@ -221,7 +221,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 						prev: prev.error,
 						next: next.error,
 						compareFn: (prev, next) =>
-							getValidationMessage(prev) !== getValidationMessage(next),
+							JSON.stringify(prev) !== JSON.stringify(next),
 						cache: diff.error,
 						scope: subject.error,
 					})) ||
@@ -271,7 +271,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 					shouldNotify({
 						prev: prev.state.validated,
 						next: next.state.validated,
-						compareFn: (prev, next) => (prev ?? false) !== (next ?? false),
+						compareFn: (prev = false, next = false) => prev !== next,
 						cache: diff.validated,
 						scope: subject.validated,
 					}))

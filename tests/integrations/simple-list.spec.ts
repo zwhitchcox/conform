@@ -133,7 +133,6 @@ async function runValidationScenario(page: Page) {
 		initialValue: {
 			items: ['Top item', 'Another item'],
 		},
-		error: {},
 		state: {
 			validated: {
 				items: true,

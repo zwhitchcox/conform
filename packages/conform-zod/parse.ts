@@ -40,19 +40,6 @@ interface SubmissionContext<Value> {
 	pending: boolean;
 }
 
-function constructError(
-	formErrors: string[] = [],
-	fieldErrors: Record<string, string[]> = {},
-) {
-	const error = fieldErrors;
-
-	if (formErrors.length > 0) {
-		error[''] = formErrors;
-	}
-
-	return error;
-}
-
 function createSubmission<Value>(
 	context: SubmissionContext<Value>,
 ): Submission<Value> {
@@ -65,18 +52,21 @@ function createSubmission<Value>(
 			reject(options) {
 				const error = Object.entries(context.error).reduce<
 					Record<string, string[]>
-				>((result, [name, messages]) => {
-					if (messages.length > 0 && context.state.validated[name]) {
-						result[name] = (result[name] ?? []).concat(messages);
-					}
+				>(
+					(result, [name, messages]) => {
+						if (messages.length > 0 && context.state.validated[name]) {
+							result[name] = (result[name] ?? []).concat(messages);
+						}
 
-					return result;
-				}, constructError(options?.formErrors, options?.fieldErrors));
+						return result;
+					},
+					{ '': options?.formErrors ?? [], ...options?.fieldErrors },
+				);
 
 				return {
 					status: context.pending ? 'updated' : 'failed',
 					initialValue: cleanup(context.initialValue) ?? {},
-					error,
+					error: cleanup(error) as Record<string, string[]>,
 					state: context.state,
 				};
 			},
@@ -88,7 +78,7 @@ function createSubmission<Value>(
 				return {
 					status: 'accepted',
 					initialValue: cleanup(context.initialValue) ?? {},
-					error: context.error,
+					error: cleanup(context.error) as Record<string, string[]>,
 					state: context.state,
 				};
 			},
@@ -103,7 +93,10 @@ function createSubmission<Value>(
 			return {
 				status: 'failed',
 				initialValue: cleanup(context.initialValue) ?? {},
-				error: constructError(options.formErrors, options.fieldErrors),
+				error: cleanup({
+					'': options.formErrors,
+					...options.fieldErrors,
+				}) as Record<string, string[]>,
 				state: context.state,
 			};
 		},
@@ -115,7 +108,6 @@ function createSubmission<Value>(
 			return {
 				status: 'accepted',
 				initialValue: cleanup(context.initialValue) ?? {},
-				error: context.error,
 				state: context.state,
 			};
 		},

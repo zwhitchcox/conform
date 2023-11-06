@@ -116,7 +116,7 @@ export default function Example() {
 	return (
 		<Form method="post" encType="multipart/form-data" {...conform.form(form)}>
 			<Playground title="Input attributes" lastSubmission={lastResult}>
-				<Alert id={form.errorId} errors={form.errors} />
+				<Alert id={form.errorId} errors={form.error} />
 				<Field label="Title" config={form.fields.title}>
 					<input
 						{...conform.input(form.fields.title, {

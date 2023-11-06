@@ -39,7 +39,7 @@ export interface BaseConfig<Type> {
 	descriptionId: string;
 	defaultValue: DefaultValue<Type>;
 	value: DefaultValue<Type>;
-	errors: string[];
+	error: string[];
 	fieldErrors: Record<string, string[]>;
 	valid: boolean;
 	dirty: boolean;
@@ -195,7 +195,7 @@ export function getFieldConfig<Type>(
 ): FieldConfig<Type> {
 	const name = options.name ?? '';
 	const id = name ? `${formId}-${name}` : formId;
-	const errors = context.error[name] ?? [];
+	const error = context.error[name] ?? [];
 
 	return new Proxy(
 		{
@@ -233,15 +233,19 @@ export function getFieldConfig<Type>(
 
 				return result;
 			},
-			errors,
+			error,
 		},
 		{
 			get(target, key, receiver) {
 				switch (key) {
-					case 'errors':
-						options.subjectRef.current.error = {
-							...options.subjectRef.current.error,
-							name: (options.subjectRef.current.error?.name ?? []).concat(name),
+					case 'error':
+					case 'defaultValue':
+					case 'value':
+					case 'valid':
+					case 'dirty':
+						options.subjectRef.current[key] = {
+							...options.subjectRef.current[key],
+							name: (options.subjectRef.current[key]?.name ?? []).concat(name),
 						};
 						break;
 					case 'fieldErrors':
@@ -250,15 +254,6 @@ export function getFieldConfig<Type>(
 							parent: (options.subjectRef.current.error?.parent ?? []).concat(
 								name,
 							),
-						};
-						break;
-					case 'defaultValue':
-					case 'value':
-					case 'valid':
-					case 'dirty':
-						options.subjectRef.current[key] = {
-							...options.subjectRef.current[key],
-							name: (options.subjectRef.current[key]?.name ?? []).concat(name),
 						};
 						break;
 				}
@@ -375,8 +370,8 @@ export function useForm<Type extends Record<string, any>>(options: {
 		get valid() {
 			return config.valid;
 		},
-		get errors() {
-			return config.errors;
+		get error() {
+			return config.error;
 		},
 		get fieldErrors() {
 			return config.fieldErrors;

@@ -23,7 +23,6 @@ async function runValidationScenario(page: Page) {
 			singleChoice: 'y',
 			multipleChoice: 'c',
 		},
-		error: {},
 		state: {
 			validated: {
 				singleChoice: true,
@@ -43,7 +42,6 @@ async function runValidationScenario(page: Page) {
 			singleChoice: 'y',
 			multipleChoice: ['a', 'c'],
 		},
-		error: {},
 		state: {
 			validated: {
 				singleChoice: true,

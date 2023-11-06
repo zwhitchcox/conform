@@ -120,7 +120,6 @@ async function runValidationScenario(page: Page) {
 			email: 'hey@conform.guide',
 			title: 'Software Developer',
 		},
-		error: {},
 		state: {
 			validated: {
 				email: true,

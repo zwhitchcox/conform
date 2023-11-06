@@ -63,7 +63,7 @@ export default function SimpleList() {
 		<ConformBoundary context={form.context}>
 			<Form method="post" {...conform.form(form)}>
 				<Playground title="Simple list" lastSubmission={lastResult}>
-					<Alert errors={form.fields.items.errors} />
+					<Alert errors={form.fields.items.error} />
 					<ol>
 						{items.map((item, index) => (
 							<li key={item.key} className="border rounded-md p-4 mb-4">

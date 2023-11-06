@@ -83,7 +83,6 @@ async function runValidationScenario(page: Page) {
 	await expect.poll(playground.result).toStrictEqual({
 		status: 'accepted',
 		initialValue: {},
-		error: {},
 		state: {
 			validated: {
 				file: true,

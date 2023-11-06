@@ -58,7 +58,6 @@ async function runValidationScenario(page: Page) {
 		initialValue: {
 			username: '@Conform2023',
 		},
-		error: {},
 		state: {
 			validated: {
 				username: true,
