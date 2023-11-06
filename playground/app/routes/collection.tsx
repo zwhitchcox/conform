@@ -43,7 +43,7 @@ export default function Example() {
 
 	return (
 		<ConformBoundary context={form.context}>
-			<Form method="post" {...conform.form(form.config)}>
+			<Form method="post" {...conform.form(form)}>
 				<Playground title="Collection" lastSubmission={lastResult}>
 					<Field label="Single choice" config={form.fields.singleChoice}>
 						{conform

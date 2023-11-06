@@ -38,31 +38,31 @@ export async function action({ request }: ActionArgs) {
 
 export default function TodoForm() {
 	const lastResult = useActionData<typeof action>();
-	const { config, fields, context } = useForm<z.input<typeof todosSchema>>({
+	const form = useForm<z.input<typeof todosSchema>>({
 		lastResult,
 		onValidate({ formData }) {
 			return parse(formData, { schema: todosSchema });
 		},
 	});
 	const tasks = useFieldList({
-		formId: config.id,
-		name: fields.tasks.name,
-		context,
+		formId: form.id,
+		name: form.fields.tasks.name,
+		context: form.context,
 	});
 
 	return (
-		<ConformBoundary formId={config.id} context={context}>
-			<Form method="post" {...conform.form(config)}>
+		<ConformBoundary context={form.context}>
+			<Form method="post" {...conform.form(form)}>
 				<div>
 					<label>Title</label>
 					<input
-						className={fields.title.errors.length > 0 ? 'error' : ''}
-						{...conform.input(fields.title)}
+						className={form.fields.title.errors.length > 0 ? 'error' : ''}
+						{...conform.input(form.fields.title)}
 					/>
-					<div id={fields.title.errorId}>{fields.title.errors}</div>
+					<div id={form.fields.title.errorId}>{form.fields.title.errors}</div>
 				</div>
 				<hr />
-				<div className="form-error">{fields.tasks.errors}</div>
+				<div className="form-error">{form.fields.tasks.errors}</div>
 				{tasks.map((task, index) => (
 					<p key={task.key}>
 						<TaskFieldset
@@ -71,12 +71,15 @@ export default function TodoForm() {
 							form={task.formId}
 						/>
 						<button
-							{...intent.list(fields.tasks, { operation: 'remove', index })}
+							{...intent.list(form.fields.tasks, {
+								operation: 'remove',
+								index,
+							})}
 						>
 							Delete
 						</button>
 						<button
-							{...intent.list(fields.tasks, {
+							{...intent.list(form.fields.tasks, {
 								operation: 'reorder',
 								from: index,
 								to: 0,
@@ -85,7 +88,7 @@ export default function TodoForm() {
 							Move to top
 						</button>
 						<button
-							{...intent.list(fields.tasks, {
+							{...intent.list(form.fields.tasks, {
 								operation: 'replace',
 								index,
 								defaultValue: { content: '' },
@@ -96,7 +99,7 @@ export default function TodoForm() {
 					</p>
 				))}
 				<button
-					{...intent.list(fields.tasks, {
+					{...intent.list(form.fields.tasks, {
 						operation: 'append',
 						defaultValue: {
 							content: '',
@@ -130,7 +133,7 @@ function TaskFieldset({ title, name, form }: TaskFieldsetProps) {
 			<div>
 				<label>{title}</label>
 				<input
-					className={task.content.invalid ? 'error' : ''}
+					className={!task.content.valid ? 'error' : ''}
 					{...conform.input(task.content)}
 				/>
 				<div>{task.content.errors}</div>
@@ -139,7 +142,7 @@ function TaskFieldset({ title, name, form }: TaskFieldsetProps) {
 				<label>
 					<span>Completed</span>
 					<input
-						className={task.completed.invalid ? 'error' : ''}
+						className={!task.completed.valid ? 'error' : ''}
 						{...conform.input(task.completed, {
 							type: 'checkbox',
 						})}

@@ -33,10 +33,14 @@ import {
 	useSyncExternalStore,
 } from 'react';
 
-export interface BaseConfig {
+export interface BaseConfig<Type> {
 	id: string;
 	errorId: string;
 	descriptionId: string;
+	defaultValue: DefaultValue<Type>;
+	value: DefaultValue<Type>;
+	errors: string[];
+	fieldErrors: Record<string, string[]>;
 	valid: boolean;
 	dirty: boolean;
 }
@@ -47,18 +51,15 @@ export interface Options<Type> {
 	context?: Form;
 }
 
-export interface FormConfig extends BaseConfig {
-	onSubmit: (event: React.FormEvent<HTMLFormElement>) => any;
+export interface FormConfig<Type extends Record<string, any>>
+	extends BaseConfig<Type> {
+	context: Form<Type>;
+	fields: FieldsetConfig<Type>;
+	onSubmit: (
+		event: React.FormEvent<HTMLFormElement>,
+	) => ReturnType<Form<Type>['submit']>;
 	onReset: (event: React.FormEvent<HTMLFormElement>) => void;
 	noValidate: boolean;
-}
-
-export interface FormResult<Type extends Record<string, unknown>> {
-	context: Form<Type>;
-	errors: string[];
-	fieldErrors: Record<string, string[]>;
-	config: FormConfig;
-	fields: FieldsetConfig<Type>;
 }
 
 export type FieldsetConfig<Type> = Type extends Array<any>
@@ -69,15 +70,11 @@ export type FieldsetConfig<Type> = Type extends Array<any>
 
 export type FieldListConfig<Item> = Array<FieldConfig<Item>>;
 
-export interface FieldConfig<Type> extends BaseConfig {
+export interface FieldConfig<Type> extends BaseConfig<Type> {
 	key?: string;
 	formId: string;
 	name: FieldName<Type>;
-	defaultValue: DefaultValue<Type>;
-	value: DefaultValue<Type>;
 	constraint: Constraint;
-	errors: string[];
-	fieldErrors: Record<string, string[]>;
 }
 
 const FormContext = createContext<Record<string, Form>>({});
@@ -272,9 +269,7 @@ export function getFieldConfig<Type>(
 	);
 }
 
-export function useForm<
-	Type extends Record<string, any> = Record<string, any>,
->(options: {
+export function useForm<Type extends Record<string, any>>(options: {
 	id?: string;
 	defaultValue?: DefaultValue<Type>;
 	lastResult?: SubmissionResult;
@@ -287,7 +282,7 @@ export function useForm<
 		submitter,
 		formData,
 	}: SubmissionContext) => Submission<any>;
-}): FormResult<Type> {
+}): FormConfig<Type> {
 	const formId = useFormId(options.id);
 	const initializeForm = () =>
 		createForm(formId, {
@@ -360,28 +355,32 @@ export function useForm<
 	);
 
 	return {
-		config: {
-			id: formId,
-			errorId: config.errorId,
-			descriptionId: config.descriptionId,
-			onSubmit,
-			onReset,
-			noValidate,
-			get dirty() {
-				return config.dirty;
-			},
-			get valid() {
-				return config.valid;
-			},
-		},
 		context: form,
+		id: formId,
+		errorId: config.errorId,
+		descriptionId: config.descriptionId,
+		fields,
+		onSubmit,
+		onReset,
+		noValidate,
+		get defaultValue() {
+			return config.defaultValue;
+		},
+		get value() {
+			return config.value;
+		},
+		get dirty() {
+			return config.dirty;
+		},
+		get valid() {
+			return config.valid;
+		},
 		get errors() {
 			return config.errors;
 		},
 		get fieldErrors() {
 			return config.fieldErrors;
 		},
-		fields,
 	};
 }
 

@@ -128,29 +128,23 @@ async function runValidationScenario(page: Page) {
 	await playground.submit.click();
 	await expect(playground.error).toHaveText(['', '', '']);
 
-	// expect(JSON.parse(await playground.submission.innerText())).toEqual({
-	// 	payload: {
-	// 		'items[0]': 'Top item',
-	// 		'items[1]': 'Another item',
-	// 	},
-	// 	error: {},
-	// 	state: {
-	// 		override: {
-	// 			"items[0]": "",
-	// 			"items[1]": "Another item",
-	// 			"items[2]": ""
-	// 		},
-	// 		validated: {
-	// 			items: true,
-	// 			'items[0]': true,
-	// 			'items[1]': true,
-	// 			'items[2]': true,
-	// 		},
-	// 		key: {
-	// 			items: [expect.any(String), expect.any(String)]
-	// 		},
-	// 	},
-	// });
+	await expect.poll(playground.result).toStrictEqual({
+		status: 'accepted',
+		initialValue: {
+			items: ['Top item', 'Another item'],
+		},
+		error: {},
+		state: {
+			validated: {
+				items: true,
+				'items[0]': true,
+				'items[1]': true,
+			},
+			key: {
+				items: [expect.any(String), expect.any(String)],
+			},
+		},
+	});
 }
 
 async function testListDefaultValue(page: Page, shouldReset?: boolean) {

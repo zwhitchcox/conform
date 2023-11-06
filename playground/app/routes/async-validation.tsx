@@ -79,7 +79,7 @@ export default function EmployeeForm() {
 
 	return (
 		<ConformBoundary context={form.context}>
-			<Form method="post" {...conform.form(form.config)}>
+			<Form method="post" {...conform.form(form)}>
 				<Playground title="Employee Form" lastSubmission={lastResult}>
 					<Field label="Email" config={form.fields.email}>
 						<input

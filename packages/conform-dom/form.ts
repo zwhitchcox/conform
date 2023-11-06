@@ -54,7 +54,13 @@ export type SubscriptionScope = {
 
 export interface Form<Type extends Record<string, unknown> = any> {
 	id: string;
-	submit(event: SubmitEvent): void;
+	submit(event: SubmitEvent): {
+		formData: FormData;
+		action: ReturnType<typeof getFormAction>;
+		encType: ReturnType<typeof getFormEncType>;
+		method: ReturnType<typeof getFormMethod>;
+		submission?: Submission<Type>;
+	};
 	reset(event: Event): void;
 	input(event: Event): void;
 	blur(event: Event): void;
@@ -275,13 +281,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		}
 	}
 
-	function submit(event: SubmitEvent): {
-		formData: FormData;
-		action: ReturnType<typeof getFormAction>;
-		encType: ReturnType<typeof getFormEncType>;
-		method: ReturnType<typeof getFormMethod>;
-		submission?: Submission<Type>;
-	} {
+	function submit(event: SubmitEvent) {
 		const element = event.target as HTMLFormElement;
 		const submitter = event.submitter as
 			| HTMLButtonElement

@@ -67,12 +67,12 @@ export default function ExampleForm() {
 	});
 
 	useEffect(() => {
-		document.forms.namedItem(form.config.id)?.reset();
-	}, [form.config.id, color]);
+		document.forms.namedItem(form.id)?.reset();
+	}, [form.id, color]);
 
 	return (
 		<ConformBoundary context={form.context}>
-			<Form method="post" {...conform.form(form.config)}>
+			<Form method="post" {...conform.form(form)}>
 				<Playground
 					title="Payment Form"
 					description={

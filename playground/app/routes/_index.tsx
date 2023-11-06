@@ -41,7 +41,7 @@ export default function Example() {
 
 	return (
 		<ConformBoundary context={form.context}>
-			<Form method="post" {...conform.form(form.config)}>
+			<Form method="post" {...conform.form(form)}>
 				<Playground title="Template Form" lastSubmission={lastResult}>
 					<Field label="Name" config={form.fields.name}>
 						<input {...conform.input(form.fields.name, { type: 'text' })} />

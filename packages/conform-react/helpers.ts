@@ -54,12 +54,12 @@ type ControlOptions = BaseOptions & {
 	hidden?: boolean;
 };
 
-type FormOptions = BaseOptions & {
-	onSubmit: (
+type FormOptions<Type extends Record<string, any>> = BaseOptions & {
+	onSubmit?: (
 		event: React.FormEvent<HTMLFormElement>,
-		context: ReturnType<FormConfig['onSubmit']>,
+		context: ReturnType<FormConfig<Type>['onSubmit']>,
 	) => void;
-	onReset: (event: React.FormEvent<HTMLFormElement>) => void;
+	onReset?: (event: React.FormEvent<HTMLFormElement>) => void;
 };
 
 type InputOptions = ControlOptions &
@@ -88,7 +88,7 @@ function cleanup<Props>(props: Props): Props {
 	return props;
 }
 
-function getAriaAttributes<Config extends BaseConfig>(
+function getAriaAttributes<Config extends BaseConfig<unknown>>(
 	config: Config,
 	options: BaseOptions = {},
 ) {
@@ -221,25 +221,31 @@ export function textarea<Schema extends Primitive | undefined | unknown>(
 	});
 }
 
-export function form(config: FormConfig, options?: FormOptions) {
+export function form<Type extends Record<string, any>>(
+	config: FormConfig<Type>,
+	options?: FormOptions<Type>,
+) {
+	const onSubmit = options?.onSubmit;
+	const onReset = options?.onReset;
+
 	return cleanup({
 		id: config.id,
 		onSubmit:
-			typeof options?.onSubmit !== 'function'
+			typeof onSubmit !== 'function'
 				? config.onSubmit
 				: (event: React.FormEvent<HTMLFormElement>) => {
 						const context = config.onSubmit(event);
 
 						if (!event.defaultPrevented) {
-							options.onSubmit(event, context);
+							onSubmit(event, context);
 						}
 				  },
 		onReset:
-			typeof options?.onReset !== 'function'
+			typeof onReset !== 'function'
 				? config.onReset
 				: (event: React.FormEvent<HTMLFormElement>) => {
 						config.onReset(event);
-						options.onReset(event);
+						onReset(event);
 				  },
 		noValidate: config.noValidate,
 		...getAriaAttributes(config, options),
@@ -247,7 +253,7 @@ export function form(config: FormConfig, options?: FormOptions) {
 }
 
 export function fieldset<
-	Schema extends Record<string, unknown> | undefined | unknown,
+	Schema extends Record<string, any> | undefined | unknown,
 >(field: FieldConfig<Schema>, options?: BaseOptions) {
 	return cleanup({
 		id: field.id,

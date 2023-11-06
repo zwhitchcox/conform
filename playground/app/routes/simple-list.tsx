@@ -54,14 +54,14 @@ export default function SimpleList() {
 			: undefined,
 	});
 	const items = useFieldList({
-		formId: form.config.id,
+		formId: form.id,
 		name: form.fields.items.name,
 		context: form.context,
 	});
 
 	return (
 		<ConformBoundary context={form.context}>
-			<Form method="post" {...conform.form(form.config)}>
+			<Form method="post" {...conform.form(form)}>
 				<Playground title="Simple list" lastSubmission={lastResult}>
 					<Alert errors={form.fields.items.errors} />
 					<ol>
