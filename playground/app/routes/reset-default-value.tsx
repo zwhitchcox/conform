@@ -51,7 +51,7 @@ export async function action({ request }: ActionArgs) {
 		schema,
 	});
 
-	if (!submission.ready) {
+	if (!submission.value) {
 		return json(submission.reject());
 	}
 

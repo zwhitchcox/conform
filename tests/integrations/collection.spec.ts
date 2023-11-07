@@ -18,7 +18,7 @@ async function runValidationScenario(page: Page) {
 
 	await expect(playground.error).toHaveText(['', '']);
 	await expect.poll(playground.result).toStrictEqual({
-		status: 'accepted',
+		status: 'success',
 		initialValue: {
 			singleChoice: 'y',
 			multipleChoice: 'c',
@@ -37,7 +37,7 @@ async function runValidationScenario(page: Page) {
 
 	await expect(playground.error).toHaveText(['', '']);
 	await expect.poll(playground.result).toStrictEqual({
-		status: 'accepted',
+		status: 'success',
 		initialValue: {
 			singleChoice: 'y',
 			multipleChoice: ['a', 'c'],

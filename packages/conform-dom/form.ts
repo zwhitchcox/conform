@@ -1,23 +1,63 @@
 import { flatten, getFormData, getValidationMessage } from './formdata.js';
 import {
+	type FieldElement,
 	isFieldElement,
 	getFormAction,
 	getFormEncType,
 	getFormMethod,
 	focusFirstInvalidField,
 } from './dom.js';
-import type {
-	FieldElement,
-	FormMetadata,
-	Submission,
-	SubmissionContext,
-	SubmissionResult,
-	DefaultValue,
-	FormState,
-	Constraint,
-} from './types.js';
 import { invariant } from './util.js';
-import { requestIntent, resolve, validate } from './intent.js';
+import {
+	type Submission,
+	type SubmissionResult,
+	requestIntent,
+	resolve,
+	validate,
+} from './submission.js';
+
+export type Primitive = null | undefined | string | number | boolean | Date;
+
+export type KeysOf<T> = T extends any ? keyof T : never;
+
+export type KeyType<T, K extends KeysOf<T>> = T extends { [k in K]?: any }
+	? T[K]
+	: undefined;
+
+export type DefaultValue<Schema> = Schema extends Primitive
+	? Schema | string
+	: Schema extends File
+	? undefined
+	: Schema extends Array<infer InnerType>
+	? Array<DefaultValue<InnerType>>
+	: Schema extends Record<string, any>
+	? { [Key in KeysOf<Schema>]?: DefaultValue<KeyType<Schema, Key>> }
+	: any;
+
+export type FieldName<Type> = string & { __type?: Type };
+
+export type Constraint = {
+	required?: boolean;
+	minLength?: number;
+	maxLength?: number;
+	min?: string | number;
+	max?: string | number;
+	step?: string | number;
+	multiple?: boolean;
+	pattern?: string;
+};
+
+export type FormMetadata = {
+	defaultValue: Record<string, unknown>;
+	constraint: Record<string, Constraint>;
+};
+
+export type FormState = {
+	key: Record<string, Array<string>>;
+	validated: Record<string, boolean>;
+	valid: Record<string, boolean>;
+	dirty: Record<string, boolean>;
+};
 
 export interface FormContext {
 	metadata: FormMetadata;
@@ -33,7 +73,11 @@ export interface FormOptions<Type> {
 	lastResult?: SubmissionResult;
 	shouldValidate?: 'onSubmit' | 'onBlur' | 'onInput';
 	shouldRevalidate?: 'onSubmit' | 'onBlur' | 'onInput';
-	onValidate?: (context: SubmissionContext) => Submission<Type>;
+	onValidate?: (context: {
+		form: HTMLFormElement;
+		submitter: HTMLInputElement | HTMLButtonElement | null;
+		formData: FormData;
+	}) => Submission<Type>;
 }
 
 export type SubscriptionSubject = {
@@ -309,7 +353,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 					submitter,
 				});
 
-				if (!submission.ready) {
+				if (!submission.value) {
 					const result = submission.reject();
 
 					if (
@@ -461,7 +505,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			}
 		}
 
-		if (result.status === 'failed') {
+		if (result.status === 'error') {
 			// Update focus
 			focusFirstInvalidField(formElement);
 		}

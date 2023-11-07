@@ -54,7 +54,7 @@ async function runValidationScenario(page: Page) {
 	await playground.submit.click();
 	await expect(playground.error).toHaveText(['']);
 	await expect.poll(playground.result).toStrictEqual({
-		status: 'accepted',
+		status: 'success',
 		initialValue: {
 			username: '@Conform2023',
 		},

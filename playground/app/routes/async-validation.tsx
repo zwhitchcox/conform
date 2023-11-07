@@ -21,7 +21,7 @@ function createSchema(
 				z.string().superRefine((email, ctx) =>
 					refine(ctx, {
 						validate: () => constraints.isEmailUnique?.(email),
-						when: intent === 'validate/email' || intent === null,
+						when: intent === 'validate/email' || intent === 'submit',
 						message: 'Email is already used',
 					}),
 				),
@@ -57,7 +57,7 @@ export async function action({ request }: ActionArgs) {
 		async: true,
 	});
 
-	if (!submission.ready) {
+	if (!submission.value) {
 		return json(submission.reject());
 	}
 

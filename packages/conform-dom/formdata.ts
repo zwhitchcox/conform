@@ -8,10 +8,14 @@ export function getFormData(
 	form: HTMLFormElement,
 	submitter?: HTMLInputElement | HTMLButtonElement | null,
 ): FormData {
-	const payload = new FormData(form);
+	const payload = new FormData(form, submitter);
 
 	if (submitter && submitter.type === 'submit' && submitter.name !== '') {
-		payload.append(submitter.name, submitter.value);
+		const entries = payload.getAll(submitter.name);
+
+		if (!entries.includes(submitter.value)) {
+			payload.append(submitter.name, submitter.value);
+		}
 	}
 
 	return payload;

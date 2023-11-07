@@ -1,4 +1,11 @@
-import type { FormControl, FieldElement, Submitter } from './types.js';
+export type FieldElement =
+	| HTMLInputElement
+	| HTMLSelectElement
+	| HTMLTextAreaElement;
+
+export type FormControl = FieldElement | HTMLButtonElement;
+
+export type Submitter = HTMLInputElement | HTMLButtonElement;
 
 /**
  * A type guard to check if the provided element is a form control

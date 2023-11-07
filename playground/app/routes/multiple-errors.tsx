@@ -120,7 +120,7 @@ export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
 	const submission = parseForm(formData, url.searchParams.get('validator'));
 
-	if (!submission.ready) {
+	if (!submission.value) {
 		return json(submission.reject());
 	}
 

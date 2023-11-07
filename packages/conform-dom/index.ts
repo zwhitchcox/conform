@@ -5,31 +5,25 @@ export {
 	type FormMetadata,
 	type FormState,
 	type FieldName,
-	type FieldElement,
-	type SubmissionContext,
-	type Submission,
-	type SubmissionResult,
 	type Primitive,
 	type DefaultValue,
-} from './types.js';
-export {
 	type FormContext,
 	type Form,
 	type SubscriptionSubject,
 	createForm,
 } from './form.js';
-export { isFieldElement } from './dom.js';
+export { type FieldElement, isFieldElement } from './dom.js';
 export { invariant } from './util.js';
 export {
+	type Submission,
+	type SubmissionResult,
 	type ListIntentPayload,
 	INTENT,
 	list,
 	validate,
 	requestIntent,
-	updateList,
-	getIntentHandler,
-	resolve,
-} from './intent.js';
+	parse,
+} from './submission.js';
 export {
 	getPaths,
 	formatPaths,

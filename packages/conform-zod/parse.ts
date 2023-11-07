@@ -1,11 +1,7 @@
 import {
-	type FormState,
 	type Submission,
-	type SubmissionResult,
 	formatPaths,
-	resolve,
-	getIntentHandler,
-	cleanup,
+	parse as baseParse,
 } from '@conform-to/dom';
 import {
 	type IssueData,
@@ -32,88 +28,6 @@ function getError({ errors }: ZodError): Record<string, string[]> {
 	}, {});
 }
 
-interface SubmissionContext<Value> {
-	initialValue: Record<string, unknown>;
-	value: Value | null;
-	error: Record<string, string[]>;
-	state: FormState;
-	pending: boolean;
-}
-
-function createSubmission<Value>(
-	context: SubmissionContext<Value>,
-): Submission<Value> {
-	if (!context.value) {
-		return {
-			ready: false,
-			pending: context.pending,
-			payload: context.initialValue,
-			error: context.error,
-			reject(options) {
-				const error = Object.entries(context.error).reduce<
-					Record<string, string[]>
-				>(
-					(result, [name, messages]) => {
-						if (messages.length > 0 && context.state.validated[name]) {
-							result[name] = (result[name] ?? []).concat(messages);
-						}
-
-						return result;
-					},
-					{ '': options?.formErrors ?? [], ...options?.fieldErrors },
-				);
-
-				return {
-					status: context.pending ? 'updated' : 'failed',
-					initialValue: cleanup(context.initialValue) ?? {},
-					error: cleanup(error) as Record<string, string[]>,
-					state: context.state,
-				};
-			},
-			accept(options) {
-				if (options?.resetForm) {
-					return { status: 'accepted' };
-				}
-
-				return {
-					status: 'accepted',
-					initialValue: cleanup(context.initialValue) ?? {},
-					error: cleanup(context.error) as Record<string, string[]>,
-					state: context.state,
-				};
-			},
-		};
-	}
-
-	return {
-		ready: true,
-		payload: context.initialValue,
-		value: context.value,
-		reject(options) {
-			return {
-				status: 'failed',
-				initialValue: cleanup(context.initialValue) ?? {},
-				error: cleanup({
-					'': options.formErrors,
-					...options.fieldErrors,
-				}) as Record<string, string[]>,
-				state: context.state,
-			};
-		},
-		accept(options) {
-			if (options?.resetForm) {
-				return { status: 'accepted' };
-			}
-
-			return {
-				status: 'accepted',
-				initialValue: cleanup(context.initialValue) ?? {},
-				state: context.state,
-			};
-		},
-	};
-}
-
 export function parse<Schema extends ZodTypeAny>(
 	payload: FormData | URLSearchParams,
 	options: {
@@ -138,52 +52,31 @@ export function parse<Schema extends ZodTypeAny>(
 		errorMap?: ZodErrorMap;
 	},
 ): Submission<output<Schema>> | Promise<Submission<output<Schema>>> {
-	const form = resolve(payload);
-	const update = getIntentHandler(form);
-	const errorMap = options.errorMap;
-	const schema = enableTypeCoercion(
-		typeof options.schema === 'function'
-			? options.schema(form.intent)
-			: options.schema,
-	);
-	const resolveSubmission = <Input, Output>(
-		result: SafeParseReturnType<Input, Output>,
-		context: {
-			intent: string | null;
-			state: any | null;
-			data: Record<string, unknown>;
-			fields: string[];
+	return baseParse(payload, {
+		resolve(payload, intent) {
+			const errorMap = options.errorMap;
+			const schema = enableTypeCoercion(
+				typeof options.schema === 'function'
+					? options.schema(intent)
+					: options.schema,
+			);
+
+			const resolveSubmission = <Input, Output>(
+				result: SafeParseReturnType<Input, Output>,
+			) => {
+				return {
+					value: result.success ? result.data : null,
+					error: !result.success ? getError(result.error) : {},
+				};
+			};
+
+			return options.async
+				? schema
+						.safeParseAsync(payload, { errorMap })
+						.then((result) => resolveSubmission(result))
+				: resolveSubmission(schema.safeParse(payload, { errorMap }));
 		},
-		updateState: (result: Omit<Required<SubmissionResult>, 'status'>) => void,
-	): Submission<Output> => {
-		const error = !result.success ? getError(result.error) : {};
-		const initialValue = context.data;
-		const state = context.state;
-
-		updateState({
-			initialValue,
-			error,
-			state,
-		});
-
-		return createSubmission({
-			initialValue,
-			state,
-			pending: context.intent !== null,
-			value: result.success ? result.data : null,
-			error,
-		});
-	};
-
-	return options.async
-		? schema
-				.safeParseAsync(form.data, { errorMap })
-				.then((result) => resolveSubmission(result, form, update))
-		: resolveSubmission(
-				schema.safeParse(form.data, { errorMap }),
-				form,
-				update,
-		  );
+	});
 }
 
 /**

@@ -1,48 +1,70 @@
-import type { DefaultValue, ResolveResult, SubmissionResult } from './types.js';
-import { createSubmitter, requestSubmit } from './dom.js';
-import { flatten, isPlainObject, setValue } from './formdata.js';
-import { invariant } from './util.js';
+import { type DefaultValue } from './form';
+import { createSubmitter, requestSubmit } from './dom';
+import { cleanup, flatten, isPlainObject, setValue } from './formdata';
+import { invariant } from './util';
 
-export type Intent<Payload = unknown> = {
-	type: string;
-	serialize(payload: Payload): string;
-	deserialize(serializedIntent: string): Payload | null;
-	createHandler(
-		data: Record<string, unknown>,
-		payload: Payload,
-	): (result: Omit<Required<SubmissionResult>, 'status'>) => void;
+export type State = {
+	key: Record<string, string[]>;
+	validated: Record<string, boolean>;
 };
 
-export const INTENT = '__intent__';
-
-/**
- * Returns the intent from the form data or search params.
- * It throws an error if multiple intent is set.
- */
-export function getIntent(payload: FormData | URLSearchParams): string | null {
-	if (!payload.has(INTENT)) {
-		return null;
-	}
-
-	const [intent, secondIntent, ...rest] = payload.getAll(INTENT);
-
-	// The submitter value is included in the formData directly on Safari 15.6.
-	// This causes the intent to be duplicated in the payload.
-	// We will ignore the second intent if it is the same as the first one.
-	if (
-		typeof intent !== 'string' ||
-		(secondIntent && intent !== secondIntent) ||
-		rest.length > 0
-	) {
-		throw new Error('The intent could only be set on a button');
-	}
-
-	return intent;
+export interface SubmissionContext<Value> {
+	type: 'update' | 'submit';
+	initialValue: Record<string, unknown>;
+	value: Value | null;
+	error: Record<string, string[]>;
+	state: State;
 }
+
+export type Submission<Output> =
+	| {
+			type: 'update';
+			payload: Record<string, unknown>;
+			value: null;
+			error: Record<string, string[]> | null;
+			reject(options?: RejectOptions): SubmissionResult;
+			accept(options?: AcceptOptions): SubmissionResult;
+	  }
+	| {
+			type: 'submit';
+			payload: Record<string, unknown>;
+			value: Output | null;
+			error: Record<string, string[]>;
+			reject(options?: RejectOptions): SubmissionResult;
+			accept(options?: AcceptOptions): SubmissionResult;
+	  };
+
+export type SubmissionResult = {
+	status: 'updated' | 'error' | 'success';
+	initialValue?: Record<string, unknown>;
+	error?: Record<string, string[]>;
+	state?: SubmissionContext<unknown>['state'];
+};
+
+export type ResolveResult = {
+	intent: string | null;
+	state: State;
+	data: Record<string, unknown>;
+	fields: string[];
+};
+
+export type AcceptOptions = {
+	resetForm?: boolean;
+};
+
+export type RejectOptions =
+	| {
+			formErrors: string[];
+			fieldErrors?: Record<string, string[]>;
+	  }
+	| {
+			formErrors?: string[];
+			fieldErrors: Record<string, string[]>;
+	  };
 
 export function resolve(payload: FormData | URLSearchParams): ResolveResult {
 	const state = payload.get('__state__');
-	const intent = getIntent(payload);
+	const intent = payload.get(INTENT);
 	const data: Record<string, unknown> = {};
 	const fields: string[] = [];
 
@@ -76,6 +98,187 @@ export function resolve(payload: FormData | URLSearchParams): ResolveResult {
 		fields,
 	};
 }
+
+export function getIntentHandler(
+	form: ResolveResult,
+	intents: Array<Intent> = [validate, list],
+): (result: Omit<Required<SubmissionResult>, 'status'>) => void {
+	if (form.intent) {
+		for (const intent of intents) {
+			const payload = intent.deserialize(form.intent);
+
+			if (payload) {
+				return intent.createHandler(form.data, payload);
+			}
+		}
+
+		throw new Error(`Unknown intent: ${form.intent}`);
+	}
+
+	return (result) => {
+		for (const name of [...form.fields, ...Object.keys(result.error)]) {
+			form.state.validated[name] = true;
+		}
+	};
+}
+
+export function parse<Value>(
+	payload: FormData | URLSearchParams,
+	options: {
+		resolve: (
+			payload: Record<string, any>,
+			intent: string,
+		) => { value?: Value; error?: Record<string, string[]> };
+	},
+): Submission<Value>;
+export function parse<Value>(
+	payload: FormData | URLSearchParams,
+	options: {
+		resolve: (
+			payload: Record<string, any>,
+			intent: string,
+		) => Promise<{ value?: Value; error?: Record<string, string[]> }>;
+	},
+): Promise<Submission<Value>>;
+export function parse<Value>(
+	payload: FormData | URLSearchParams,
+	options: {
+		resolve: (
+			payload: Record<string, any>,
+			intent: string,
+		) =>
+			| { value?: Value; error?: Record<string, string[]> }
+			| Promise<{ value?: Value; error?: Record<string, string[]> }>;
+	},
+): Submission<Value> | Promise<Submission<Value>>;
+export function parse<Value>(
+	payload: FormData | URLSearchParams,
+	options: {
+		resolve: (
+			payload: Record<string, any>,
+			intent: string,
+		) =>
+			| { value?: Value; error?: Record<string, string[]> }
+			| Promise<{ value?: Value; error?: Record<string, string[]> }>;
+	},
+): Submission<Value> | Promise<Submission<Value>> {
+	const form = resolve(payload);
+	const update = getIntentHandler(form);
+	const result = options.resolve(form.data, form.intent ?? 'submit');
+	const mergeResolveResult = (resolved: {
+		error?: Record<string, string[]>;
+		value?: Value;
+	}): Submission<Value> => {
+		const error = resolved.error ?? {};
+		const initialValue = form.data;
+		const state = form.state;
+
+		update({
+			initialValue,
+			error,
+			state,
+		});
+
+		return createSubmission({
+			type: form.intent !== null ? 'update' : 'submit',
+			initialValue,
+			value: resolved.value ?? null,
+			error,
+			state,
+		});
+	};
+
+	if (result instanceof Promise) {
+		return result.then(mergeResolveResult);
+	}
+
+	return mergeResolveResult(result);
+}
+
+export function createSubmission<Value>(
+	context: SubmissionContext<Value>,
+): Submission<Value> {
+	if (context.type === 'update') {
+		return {
+			type: 'update',
+			payload: context.initialValue,
+			value: null,
+			error: context.error,
+			accept(options) {
+				return acceptSubmission(context, options);
+			},
+			reject(options) {
+				return rejectSubmission(context, options);
+			},
+		};
+	}
+
+	return {
+		type: context.type,
+		payload: context.initialValue,
+		value: context.value,
+		error: context.error,
+		accept(options) {
+			return acceptSubmission(context, options);
+		},
+		reject(options) {
+			return rejectSubmission(context, options);
+		},
+	};
+}
+
+export function acceptSubmission(
+	context: SubmissionContext<unknown>,
+	options?: AcceptOptions,
+): SubmissionResult {
+	if (options?.resetForm) {
+		return { status: 'success' };
+	}
+
+	return {
+		status: 'success',
+		initialValue: cleanup(context.initialValue) ?? {},
+		error: cleanup(context.error) as Record<string, string[]>,
+		state: context.state,
+	};
+}
+
+export function rejectSubmission(
+	context: SubmissionContext<unknown>,
+	options?: RejectOptions,
+): SubmissionResult {
+	const error = Object.entries(context.error ?? {}).reduce<
+		Record<string, string[]>
+	>(
+		(result, [name, messages]) => {
+			if (messages.length > 0 && context.state.validated[name]) {
+				result[name] = (result[name] ?? []).concat(messages);
+			}
+
+			return result;
+		},
+		{ '': options?.formErrors ?? [], ...options?.fieldErrors },
+	);
+
+	return {
+		status: context.type === 'update' ? 'updated' : 'error',
+		initialValue: cleanup(context.initialValue) ?? {},
+		error: cleanup(error) as Record<string, string[]>,
+		state: context.state,
+	};
+}
+
+export type Intent<Payload = unknown> = {
+	type: string;
+	serialize(payload: Payload): string;
+	deserialize(serializedIntent: string): Payload | null;
+	createHandler(
+		data: Record<string, unknown>,
+		payload: Payload,
+	): (result: Omit<Required<SubmissionResult>, 'status'>) => void;
+};
+
+export const INTENT = '__intent__';
 
 export function createIntent(options: {
 	type: string;
@@ -247,29 +450,6 @@ export function requestIntent(
 	});
 
 	requestSubmit(form, submitter);
-}
-
-export function getIntentHandler(
-	form: ResolveResult,
-	intents: Array<Intent> = [validate, list],
-): (result: Omit<Required<SubmissionResult>, 'status'>) => void {
-	if (form.intent) {
-		for (const intent of intents) {
-			const payload = intent.deserialize(form.intent);
-
-			if (payload) {
-				return intent.createHandler(form.data, payload);
-			}
-		}
-
-		throw new Error(`Unknown intent: ${form.intent}`);
-	}
-
-	return (result) => {
-		for (const name of [...form.fields, ...Object.keys(result.error)]) {
-			form.state.validated[name] = true;
-		}
-	};
 }
 
 export function updateList<Schema>(

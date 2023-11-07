@@ -6,7 +6,6 @@ import {
 	type FieldName,
 	type Form,
 	type FormContext,
-	type SubmissionContext,
 	type SubmissionResult,
 	type Submission,
 	type SubscriptionSubject,
@@ -276,7 +275,11 @@ export function useForm<Type extends Record<string, any>>(options: {
 		form,
 		submitter,
 		formData,
-	}: SubmissionContext) => Submission<any>;
+	}: {
+		form: HTMLFormElement;
+		submitter: HTMLInputElement | HTMLButtonElement | null;
+		formData: FormData;
+	}) => Submission<any>;
 }): FormConfig<Type> {
 	const formId = useFormId(options.id);
 	const initializeForm = () =>

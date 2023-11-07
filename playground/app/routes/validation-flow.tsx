@@ -44,7 +44,7 @@ export async function action({ request }: ActionArgs) {
 	const formData = await request.formData();
 	const submission = parse(formData, { schema });
 
-	if (!submission.ready) {
+	if (!submission.value) {
 		return json(submission.reject());
 	}
 
