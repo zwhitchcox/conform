@@ -8,7 +8,7 @@ import {
 
 type Field<Schema> = {
 	name: FieldName<Schema>;
-	form?: string;
+	formId?: string;
 };
 
 type OmitKey<T, K extends string> = T extends any ? Omit<T, K> : never;
@@ -25,7 +25,7 @@ function createIntentButtonProps(value: string, form?: string) {
 export function validate<Schema>(field: Field<Schema>) {
 	return createIntentButtonProps(
 		validateIntent.serialize(field.name),
-		field.form,
+		field.formId,
 	);
 }
 
@@ -35,6 +35,6 @@ export function list<Schema>(
 ) {
 	return createIntentButtonProps(
 		listIntent.serialize({ name: field.name, ...payload }),
-		field.form,
+		field.formId,
 	);
 }

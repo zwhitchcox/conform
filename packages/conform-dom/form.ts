@@ -1,4 +1,4 @@
-import { flatten, getFormData, getValidationMessage } from './formdata.js';
+import { flatten, getFormData, isMatchingPaths } from './formdata.js';
 import {
 	type FieldElement,
 	isFieldElement,
@@ -214,9 +214,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			if (
 				parents.length === 0 ||
 				names.includes(name) ||
-				parents.includes(name) ||
-				parents.some((parent) => name.startsWith(`${parent}.`)) ||
-				parents.some((parent) => name.startsWith(`${parent}[`))
+				parents.some((parent) => isMatchingPaths(name, parent))
 			) {
 				config.cache[name] ??= config.compareFn(
 					config.prev[name],
@@ -281,8 +279,9 @@ export function createForm<Type extends Record<string, unknown> = any>(
 					shouldNotify({
 						prev: prev.state.key,
 						next: next.state.key,
-						compareFn: (prev, next) =>
-							getValidationMessage(prev) !== getValidationMessage(next),
+						compareFn: (prev = [], next = []) =>
+							prev.join(String.fromCharCode(31)) !==
+							next.join(String.fromCharCode(31)),
 						cache: diff.key,
 						scope: subject.key,
 					})) ||
@@ -357,7 +356,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 					const result = submission.reject();
 
 					if (
-						result.error &&
+						!result.error ||
 						Object.values(result.error).every(
 							(messages) => !messages.includes('__VALIDATION_UNDEFINED__'),
 						)

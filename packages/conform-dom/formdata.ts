@@ -70,6 +70,16 @@ export function formatPaths(paths: Array<string | number>): string {
 	}, '');
 }
 
+export function isMatchingPaths(name: string, parent: string) {
+	const paths = getPaths(name);
+	const parentPaths = getPaths(parent);
+
+	return (
+		paths.length >= parentPaths.length &&
+		parentPaths.every((path, index) => paths[index] === path)
+	);
+}
+
 /**
  * Assign a value to a target object by following the paths on the name
  */
@@ -222,14 +232,4 @@ export function flatten(
 	}
 
 	return result;
-}
-
-/**
- * Format the error messages into a validation message
- */
-export function getValidationMessage(
-	errors?: string[],
-	delimiter = String.fromCharCode(31),
-): string {
-	return errors?.join(delimiter) ?? '';
 }

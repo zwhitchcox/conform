@@ -30,5 +30,6 @@ export {
 	setValue,
 	flatten,
 	isPlainObject,
+	isMatchingPaths,
 	cleanup,
 } from './formdata.js';

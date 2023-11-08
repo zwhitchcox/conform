@@ -13,6 +13,7 @@ import {
 	createForm,
 	isFieldElement,
 	getPaths,
+	isMatchingPaths,
 	formatPaths,
 } from '@conform-to/dom';
 import {
@@ -39,7 +40,8 @@ export interface BaseConfig<Type> {
 	defaultValue: DefaultValue<Type>;
 	value: DefaultValue<Type>;
 	error: string[];
-	fieldErrors: Record<string, string[]>;
+	fieldError: Record<string, string[]>;
+	fieldValid: boolean;
 	valid: boolean;
 	dirty: boolean;
 }
@@ -195,6 +197,15 @@ export function getFieldConfig<Type>(
 	const name = options.name ?? '';
 	const id = name ? `${formId}-${name}` : formId;
 	const error = context.error[name] ?? [];
+	const updateSubject = (
+		key: keyof SubscriptionSubject,
+		type: 'parent' | 'name',
+	) => {
+		options.subjectRef.current[key] = {
+			...options.subjectRef.current[key],
+			[type]: (options.subjectRef.current[key]?.[type] ?? []).concat(name),
+		};
+	};
 
 	return new Proxy(
 		{
@@ -213,7 +224,22 @@ export function getFieldConfig<Type>(
 			get dirty() {
 				return context.state.dirty[name] ?? false;
 			},
-			get fieldErrors() {
+			get fieldValid() {
+				const keys = Object.keys(context.error);
+
+				if (name === '') {
+					return keys.length === 0;
+				}
+
+				for (const key of Object.keys(context.error)) {
+					if (isMatchingPaths(key, name) && !context.state.valid[key]) {
+						return false;
+					}
+				}
+
+				return true;
+			},
+			get fieldError() {
 				if (name === '') {
 					return context.error;
 				}
@@ -221,11 +247,7 @@ export function getFieldConfig<Type>(
 				const result: Record<string, string[]> = {};
 
 				for (const [key, errors] of Object.entries(context.error)) {
-					if (
-						key === name ||
-						key.startsWith(`${name}.`) ||
-						key.startsWith(`${name}[`)
-					) {
+					if (isMatchingPaths(key, name)) {
 						result[key] = errors;
 					}
 				}
@@ -242,18 +264,13 @@ export function getFieldConfig<Type>(
 					case 'value':
 					case 'valid':
 					case 'dirty':
-						options.subjectRef.current[key] = {
-							...options.subjectRef.current[key],
-							name: (options.subjectRef.current[key]?.name ?? []).concat(name),
-						};
+						updateSubject(key, 'name');
 						break;
-					case 'fieldErrors':
-						options.subjectRef.current.error = {
-							...options.subjectRef.current.error,
-							parent: (options.subjectRef.current.error?.parent ?? []).concat(
-								name,
-							),
-						};
+					case 'fieldError':
+						updateSubject('error', 'parent');
+						break;
+					case 'fieldValid':
+						updateSubject('valid', 'parent');
 						break;
 				}
 
@@ -376,8 +393,11 @@ export function useForm<Type extends Record<string, any>>(options: {
 		get error() {
 			return config.error;
 		},
-		get fieldErrors() {
-			return config.fieldErrors;
+		get fieldError() {
+			return config.fieldError;
+		},
+		get fieldValid() {
+			return config.fieldValid;
 		},
 	};
 }

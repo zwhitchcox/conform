@@ -137,14 +137,12 @@ export default function Example() {
 			: undefined,
 	});
 
-	const username = form.fields.username;
-
 	return (
 		<ConformBoundary context={form.context}>
 			<Form method="post" {...conform.form(form)}>
 				<Playground title="Mutliple Errors" lastSubmission={lastResult}>
-					<Field label="Username" config={username}>
-						<input {...conform.input(username, { type: 'text' })} />
+					<Field label="Username" config={form.fields.username}>
+						<input {...conform.input(form.fields.username, { type: 'text' })} />
 					</Field>
 				</Playground>
 			</Form>
