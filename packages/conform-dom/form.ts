@@ -1,4 +1,12 @@
-import { flatten, getFormData, isMatchingPaths } from './formdata.js';
+import {
+	flatten,
+	formatPaths,
+	getFormData,
+	getPaths,
+	isMatchingPaths,
+	isPlainObject,
+	setValue,
+} from './formdata.js';
 import {
 	type FieldElement,
 	isFieldElement,
@@ -147,12 +155,56 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			value,
 			error,
 			state: {
-				key: options.lastResult?.state?.key ?? {},
 				validated: options.lastResult?.state?.validated ?? {},
+				key: createKeyProxy(
+					options.lastResult?.state?.key ?? getDefaultKey(metadata),
+				),
 				valid: createValidProxy(error),
 				dirty: createDirtyProxy(metadata.defaultValue, value),
 			},
 		};
+	}
+
+	function getDefaultKey(metadata: FormMetadata): Record<string, string> {
+		return Object.entries(metadata.defaultValue).reduce<Record<string, string>>(
+			(result, [key, value]) => {
+				if (Array.isArray(value)) {
+					for (let i = 0; i < value.length; i++) {
+						result[formatPaths([...getPaths(key), i])] = (
+							Date.now() * Math.random()
+						).toString(36);
+					}
+				}
+
+				return result;
+			},
+			{},
+		);
+	}
+
+	function createKeyProxy(key: Record<string, string>): Record<string, string> {
+		const cache: Record<string, string | undefined> = {};
+		const keyProxy = new Proxy(key, {
+			get(_, name: string) {
+				if (typeof cache[name] === 'undefined') {
+					const currentKey = key[name] ?? '';
+					const resultKey =
+						name === ''
+							? currentKey
+							: `${
+									keyProxy[formatPaths(getPaths(name).slice(0, -1))] ?? ''
+							  }${currentKey}`;
+
+					if (resultKey) {
+						cache[name] = resultKey;
+					}
+				}
+
+				return cache[name];
+			},
+		});
+
+		return keyProxy;
 	}
 
 	function createValidProxy(
@@ -199,30 +251,35 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		next: Record<string, Type>;
 		compareFn: (prev: Type | undefined, next: Type | undefined) => boolean;
 		cache: Record<string, boolean>;
-		scope: SubscriptionScope;
+		scope?: SubscriptionScope;
 	}): boolean {
-		const parents = config.scope.parent ?? [];
-		const names = config.scope.name ?? [];
-		const list =
-			parents.length === 0
-				? names
-				: Array.from(
-						new Set([...Object.keys(config.prev), ...Object.keys(config.next)]),
-				  );
+		if (config.scope) {
+			const parents = config.scope.parent ?? [];
+			const names = config.scope.name ?? [];
+			const list =
+				parents.length === 0
+					? names
+					: Array.from(
+							new Set([
+								...Object.keys(config.prev),
+								...Object.keys(config.next),
+							]),
+					  );
 
-		for (const name of list) {
-			if (
-				parents.length === 0 ||
-				names.includes(name) ||
-				parents.some((parent) => isMatchingPaths(name, parent))
-			) {
-				config.cache[name] ??= config.compareFn(
-					config.prev[name],
-					config.next[name],
-				);
+			for (const name of list) {
+				if (
+					parents.length === 0 ||
+					names.includes(name) ||
+					parents.some((parent) => isMatchingPaths(name, parent))
+				) {
+					config.cache[name] ??= config.compareFn(
+						config.prev[name],
+						config.next[name],
+					);
 
-				if (config.cache[name]) {
-					return true;
+					if (config.cache[name]) {
+						return true;
+					}
 				}
 			}
 		}
@@ -230,7 +287,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		return false;
 	}
 
-	function updateContext(update: FormContext) {
+	function updateContext(next: FormContext) {
 		const diff: Record<keyof SubscriptionSubject, Record<string, boolean>> = {
 			value: {},
 			error: {},
@@ -241,14 +298,6 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			dirty: {},
 		};
 		const prev = context;
-		const next = {
-			...update,
-			state: {
-				...update.state,
-				valid: createValidProxy(update.error),
-				dirty: createDirtyProxy(update.metadata.defaultValue, update.value),
-			},
-		};
 
 		// Apply change before notifying subscribers
 		context = next;
@@ -258,64 +307,58 @@ export function createForm<Type extends Record<string, unknown> = any>(
 
 			if (
 				!subject ||
-				(subject.error &&
-					shouldNotify({
-						prev: prev.error,
-						next: next.error,
-						compareFn: (prev, next) =>
-							JSON.stringify(prev) !== JSON.stringify(next),
-						cache: diff.error,
-						scope: subject.error,
-					})) ||
-				(subject.defaultValue &&
-					shouldNotify({
-						prev: prev.initialValue,
-						next: next.initialValue,
-						compareFn: (prev, next) => prev !== next,
-						cache: diff.defaultValue,
-						scope: subject.defaultValue,
-					})) ||
-				(subject.key &&
-					shouldNotify({
-						prev: prev.state.key,
-						next: next.state.key,
-						compareFn: (prev, next) => prev !== next,
-						cache: diff.key,
-						scope: subject.key,
-					})) ||
-				(subject.valid &&
-					shouldNotify({
-						prev: prev.state.valid,
-						next: next.state.valid,
-						compareFn: (prev, next) => prev !== next,
-						cache: diff.valid,
-						scope: subject.valid,
-					})) ||
-				(subject.dirty &&
-					shouldNotify({
-						prev: prev.state.dirty,
-						next: next.state.dirty,
-						compareFn: (prev, next) => prev !== next,
-						cache: diff.dirty,
-						scope: subject.dirty,
-					})) ||
-				(subject.value &&
-					shouldNotify({
-						prev: prev.value,
-						next: next.value,
-						compareFn: (prev, next) =>
-							JSON.stringify(prev) !== JSON.stringify(next),
-						cache: diff.value,
-						scope: subject.value,
-					})) ||
-				(subject.validated &&
-					shouldNotify({
-						prev: prev.state.validated,
-						next: next.state.validated,
-						compareFn: (prev = false, next = false) => prev !== next,
-						cache: diff.validated,
-						scope: subject.validated,
-					}))
+				shouldNotify({
+					prev: prev.error,
+					next: next.error,
+					compareFn: (prev, next) =>
+						JSON.stringify(prev) !== JSON.stringify(next),
+					cache: diff.error,
+					scope: subject.error,
+				}) ||
+				shouldNotify({
+					prev: prev.initialValue,
+					next: next.initialValue,
+					compareFn: (prev, next) =>
+						JSON.stringify(prev) !== JSON.stringify(next),
+					cache: diff.defaultValue,
+					scope: subject.defaultValue,
+				}) ||
+				shouldNotify({
+					prev: prev.state.key,
+					next: next.state.key,
+					compareFn: (prev, next) => prev !== next,
+					cache: diff.key,
+					scope: subject.key,
+				}) ||
+				shouldNotify({
+					prev: prev.state.valid,
+					next: next.state.valid,
+					compareFn: (prev, next) => prev !== next,
+					cache: diff.valid,
+					scope: subject.valid,
+				}) ||
+				shouldNotify({
+					prev: prev.state.dirty,
+					next: next.state.dirty,
+					compareFn: (prev, next) => prev !== next,
+					cache: diff.dirty,
+					scope: subject.dirty,
+				}) ||
+				shouldNotify({
+					prev: prev.value,
+					next: next.value,
+					compareFn: (prev, next) =>
+						JSON.stringify(prev) !== JSON.stringify(next),
+					cache: diff.value,
+					scope: subject.value,
+				}) ||
+				shouldNotify({
+					prev: prev.state.validated,
+					next: next.state.validated,
+					compareFn: (prev = false, next = false) => prev !== next,
+					cache: diff.validated,
+					scope: subject.validated,
+				})
 			) {
 				subscriber.callback();
 			}
@@ -415,10 +458,15 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		if (event.defaultPrevented || !willValidate(element, 'onInput')) {
 			const formData = new FormData(element.form);
 			const result = resolve(formData);
+			const value = flatten(result.data);
 
 			updateContext({
 				...context,
-				value: flatten(result.data),
+				value,
+				state: {
+					...context.state,
+					dirty: createDirtyProxy(context.metadata.defaultValue, value),
+				},
 			});
 		} else {
 			requestIntent(element.form, {
@@ -465,9 +513,9 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			error: {},
 			state: {
 				validated: {},
-				key: {},
-				valid: {},
-				dirty: {},
+				key: createKeyProxy(getDefaultKey(metadata)),
+				valid: createValidProxy({}),
+				dirty: createDirtyProxy(metadata.defaultValue, metadata.defaultValue),
 			},
 		});
 	}
@@ -480,17 +528,50 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			return;
 		}
 
+		const key = createKeyProxy(result.state?.key ?? {});
 		const value = flatten(result.initialValue);
+		const keyToName = Object.fromEntries(
+			Object.entries(context.state.key).map(([key, value]) => [value, key]),
+		);
+		const initialValue = flatten(
+			Array.from(
+				new Set([...Object.keys(context.initialValue), ...Object.keys(value)]),
+			).reduce<Record<string, unknown>>((result, name) => {
+				let data: unknown;
+
+				if (
+					!isPlainObject(context.initialValue[name]) &&
+					!Array.isArray(context.initialValue[name])
+				) {
+					if (context.state.key[name] === key[name]) {
+						data = context.initialValue[name];
+					} else {
+						data =
+							context.initialValue[keyToName[key[name] as string] as string] ??
+							value[name];
+					}
+
+					if (typeof data !== 'undefined') {
+						setValue(result, name, () => data);
+					}
+				}
+
+				return result;
+			}, {}),
+		);
+		const error = result.error ?? {};
 
 		updateContext({
 			...context,
-			initialValue: value,
+			initialValue,
 			value,
-			error: result.error ?? {},
+			error,
 			state: {
 				...context.state,
-				key: result.state?.key ?? {},
 				validated: result.state?.validated ?? {},
+				key,
+				valid: createValidProxy(error),
+				dirty: createDirtyProxy(context.metadata.defaultValue, value),
 			},
 		});
 

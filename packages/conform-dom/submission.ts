@@ -1,13 +1,6 @@
 import { type DefaultValue } from './form';
 import { createSubmitter, requestSubmit } from './dom';
-import {
-	cleanup,
-	flatten,
-	formatPaths,
-	getPaths,
-	isPlainObject,
-	setValue,
-} from './formdata';
+import { cleanup, flatten, isPlainObject, setValue } from './formdata';
 import { invariant } from './util';
 
 export type State = {
@@ -369,10 +362,7 @@ export const validate = createIntent({
 	},
 });
 
-export const list = createIntent<
-	ListIntentPayload,
-	{ defaultListKeys: string[] }
->({
+export const list = createIntent<ListIntentPayload, {}>({
 	type: 'list',
 	serialize(payload) {
 		return JSON.stringify(payload);
@@ -388,20 +378,12 @@ export const list = createIntent<
 
 			return currentValue ?? [];
 		});
-		// Derive the list keys before updating it
-		const defaultListKeys = Object.keys(list);
 
 		updateList(list, payload);
 
-		return {
-			defaultListKeys,
-		};
+		return {};
 	},
-	update(result, payload, { defaultListKeys }) {
-		for (let i = 0; i < defaultListKeys.length; i++) {
-			result.state.key[formatPaths([...getPaths(payload.name), i])] ??= `${i}`;
-		}
-
+	update(result, payload) {
 		switch (payload.operation) {
 			case 'append':
 			case 'prepend':
