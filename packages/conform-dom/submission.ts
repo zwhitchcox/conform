@@ -1,10 +1,17 @@
 import { type DefaultValue } from './form';
 import { createSubmitter, requestSubmit } from './dom';
-import { cleanup, flatten, isPlainObject, setValue } from './formdata';
+import {
+	cleanup,
+	flatten,
+	formatPaths,
+	getPaths,
+	isPlainObject,
+	setValue,
+} from './formdata';
 import { invariant } from './util';
 
 export type State = {
-	key: Record<string, string[]>;
+	key: Record<string, string>;
 	validated: Record<string, boolean>;
 };
 
@@ -391,28 +398,29 @@ export const list = createIntent<
 		};
 	},
 	update(result, payload, { defaultListKeys }) {
-		const keys = result.state.key[payload.name] ?? defaultListKeys;
+		for (let i = 0; i < defaultListKeys.length; i++) {
+			result.state.key[formatPaths([...getPaths(payload.name), i])] ??= `${i}`;
+		}
 
 		switch (payload.operation) {
 			case 'append':
 			case 'prepend':
 			case 'replace':
-				updateState(result.state.validated, payload.name, {
+				updateState(result.state.validated, {
 					...payload,
 					defaultValue: undefined,
 				});
-				updateList(keys, {
+				updateState(result.state.key, {
 					...payload,
 					defaultValue: (Date.now() * Math.random()).toString(36),
 				});
 				break;
 			default:
-				updateState(result.state.validated, payload.name, payload);
-				updateList(keys, payload);
+				updateState(result.state.validated, payload);
+				updateState(result.state.key, payload);
 				break;
 		}
 
-		result.state.key[payload.name] = keys;
 		result.state.validated[payload.name] = true;
 	},
 });
@@ -479,7 +487,6 @@ export function updateList<Schema>(
 
 export function updateState<Schema>(
 	data: Record<string, unknown>,
-	name: string,
 	payload: ListIntentPayload<Schema>,
 ): void {
 	const root = Symbol.for('root');
@@ -491,7 +498,7 @@ export function updateState<Schema>(
 	for (const key of keys) {
 		const value = data[key];
 
-		if (key.startsWith(name) && key !== name) {
+		if (key.startsWith(payload.name) && key !== payload.name) {
 			setValue(target, key, (prev) => {
 				if (typeof prev === 'undefined') {
 					return value;
@@ -508,7 +515,7 @@ export function updateState<Schema>(
 		}
 	}
 
-	const value = setValue(target, name, (value) => value ?? []);
+	const value = setValue(target, payload.name, (value) => value ?? []);
 
 	if (!Array.isArray(value)) {
 		throw new Error('The name provided is not pointed to a list');
@@ -530,7 +537,7 @@ export function updateState<Schema>(
 
 				return data;
 			},
-			prefix: name,
+			prefix: payload.name,
 		}),
 	);
 }

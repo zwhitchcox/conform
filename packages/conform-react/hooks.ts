@@ -190,7 +190,7 @@ export function getFieldConfig<Type>(
 	context: FormContext,
 	options: {
 		name?: string;
-		key?: string;
+		defaultKey?: string;
 		subjectRef: MutableRefObject<SubscriptionSubject>;
 	},
 ): FieldConfig<Type> {
@@ -209,7 +209,7 @@ export function getFieldConfig<Type>(
 
 	return new Proxy(
 		{
-			key: options.key,
+			key: context.state.key[name] ?? options.defaultKey,
 			id,
 			formId,
 			errorId: `${id}-error`,
@@ -259,6 +259,7 @@ export function getFieldConfig<Type>(
 		{
 			get(target, key, receiver) {
 				switch (key) {
+					case 'key':
 					case 'error':
 					case 'defaultValue':
 					case 'value':
@@ -448,39 +449,29 @@ export function useFieldList<Item>(
 	options: FieldListOptions<Item>,
 ): FieldListConfig<Item> {
 	const subjectRef = useSubjectRef({
-		key: {
+		defaultValue: {
 			name: [options.name],
 		},
 	});
 	const context = useFormContext(options.formId, options.context, subjectRef);
-	const keys = useMemo(() => {
-		let keys = context.state.key[options.name];
+	const defaultValue = context.initialValue[options.name] ?? [];
 
-		if (!keys) {
-			const list = context.metadata.defaultValue[options.name] ?? [];
+	if (!Array.isArray(defaultValue)) {
+		throw new Error('The default value at the given name is not a list');
+	}
 
-			if (!Array.isArray(list)) {
-				throw new Error('The default value at the given name is not a list');
-			}
+	return Array(defaultValue.length)
+		.fill(0)
+		.map((_, index) => {
+			const name = getName(index, options.name);
+			const config = getFieldConfig<Item>(options.formId, context, {
+				name,
+				defaultKey: `${index}`,
+				subjectRef,
+			});
 
-			keys = Array(list.length)
-				.fill('')
-				.map((_, index) => `${index}`);
-		}
-
-		return keys;
-	}, [options.name, context]);
-
-	return keys.map((key, index) => {
-		const name = getName(index, options.name);
-		const config = getFieldConfig<Item>(options.formId, context, {
-			name,
-			key,
-			subjectRef,
+			return config;
 		});
-
-		return config;
-	});
 }
 
 export function useSubjectRef(

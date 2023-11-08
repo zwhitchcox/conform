@@ -53,7 +53,7 @@ export type FormMetadata = {
 };
 
 export type FormState = {
-	key: Record<string, Array<string>>;
+	key: Record<string, string>;
 	validated: Record<string, boolean>;
 	valid: Record<string, boolean>;
 	dirty: Record<string, boolean>;
@@ -269,8 +269,8 @@ export function createForm<Type extends Record<string, unknown> = any>(
 					})) ||
 				(subject.defaultValue &&
 					shouldNotify({
-						prev: prev.metadata.defaultValue,
-						next: next.metadata.defaultValue,
+						prev: prev.initialValue,
+						next: next.initialValue,
 						compareFn: (prev, next) => prev !== next,
 						cache: diff.defaultValue,
 						scope: subject.defaultValue,
@@ -279,9 +279,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 					shouldNotify({
 						prev: prev.state.key,
 						next: next.state.key,
-						compareFn: (prev = [], next = []) =>
-							prev.join(String.fromCharCode(31)) !==
-							next.join(String.fromCharCode(31)),
+						compareFn: (prev, next) => prev !== next,
 						cache: diff.key,
 						scope: subject.key,
 					})) ||

@@ -140,7 +140,8 @@ async function runValidationScenario(page: Page) {
 				'items[1]': true,
 			},
 			key: {
-				items: [expect.any(String), expect.any(String)],
+				'items[0]': expect.any(String),
+				'items[1]': expect.any(String),
 			},
 		},
 	});
