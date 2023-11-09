@@ -40,8 +40,8 @@ export interface BaseConfig<Type> {
 	defaultValue: DefaultValue<Type>;
 	value: DefaultValue<Type>;
 	error: string[];
-	fieldError: Record<string, string[]>;
-	fieldValid: boolean;
+	allError: Record<string, string[]>;
+	allValid: boolean;
 	valid: boolean;
 	dirty: boolean;
 }
@@ -224,7 +224,7 @@ export function getFieldConfig<Type>(
 			get dirty() {
 				return context.state.dirty[name] ?? false;
 			},
-			get fieldValid() {
+			get allValid() {
 				const keys = Object.keys(context.error);
 
 				if (name === '') {
@@ -239,7 +239,7 @@ export function getFieldConfig<Type>(
 
 				return true;
 			},
-			get fieldError() {
+			get allError() {
 				if (name === '') {
 					return context.error;
 				}
@@ -267,10 +267,10 @@ export function getFieldConfig<Type>(
 					case 'dirty':
 						updateSubject(key, 'name');
 						break;
-					case 'fieldError':
+					case 'allError':
 						updateSubject('error', 'parent');
 						break;
-					case 'fieldValid':
+					case 'allValid':
 						updateSubject('valid', 'parent');
 						break;
 				}
@@ -394,11 +394,11 @@ export function useForm<Type extends Record<string, any>>(options: {
 		get error() {
 			return config.error;
 		},
-		get fieldError() {
-			return config.fieldError;
+		get allError() {
+			return config.allError;
 		},
-		get fieldValid() {
-			return config.fieldValid;
+		get allValid() {
+			return config.allValid;
 		},
 	};
 }
