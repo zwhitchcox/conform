@@ -3,7 +3,7 @@ import {
 	formatPaths,
 	getFormData,
 	getPaths,
-	isMatchingPaths,
+	isSubpath,
 	isPlainObject,
 	setValue,
 } from './formdata.js';
@@ -13,7 +13,6 @@ import {
 	getFormAction,
 	getFormEncType,
 	getFormMethod,
-	focusFirstInvalidField,
 } from './dom.js';
 import { invariant } from './util.js';
 import {
@@ -24,22 +23,28 @@ import {
 	validate,
 } from './submission.js';
 
-export type Primitive = null | undefined | string | number | boolean | Date;
+export type UnionKeyof<T> = T extends any ? keyof T : never;
 
-export type KeysOf<T> = T extends any ? keyof T : never;
-
-export type KeyType<T, K extends KeysOf<T>> = T extends { [k in K]?: any }
+export type UnionKeyType<T, K extends UnionKeyof<T>> = T extends {
+	[k in K]?: any;
+}
 	? T[K]
 	: undefined;
 
-export type DefaultValue<Schema> = Schema extends Primitive
+export type DefaultValue<Schema> = Schema extends
+	| string
+	| number
+	| boolean
+	| Date
+	| null
+	| undefined
 	? Schema | string
 	: Schema extends File
 	? undefined
 	: Schema extends Array<infer InnerType>
 	? Array<DefaultValue<InnerType>>
 	: Schema extends Record<string, any>
-	? { [Key in KeysOf<Schema>]?: DefaultValue<KeyType<Schema, Key>> }
+	? { [Key in UnionKeyof<Schema>]?: DefaultValue<UnionKeyType<Schema, Key>> }
 	: any;
 
 export type FieldName<Type> = string & { __type?: Type };
@@ -270,7 +275,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 				if (
 					parents.length === 0 ||
 					names.includes(name) ||
-					parents.some((parent) => isMatchingPaths(name, parent))
+					parents.some((parent) => isSubpath(name, parent))
 				) {
 					config.cache[name] ??= config.compareFn(
 						config.prev[name],
@@ -469,10 +474,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 				},
 			});
 		} else {
-			requestIntent(element.form, {
-				value: validate.serialize(element.name),
-				formNoValidate: true,
-			});
+			requestIntent(element.form, validate.serialize(element.name));
 		}
 	}
 
@@ -487,10 +489,7 @@ export function createForm<Type extends Record<string, unknown> = any>(
 			return;
 		}
 
-		requestIntent(element.form, {
-			value: validate.serialize(element.name),
-			formNoValidate: true,
-		});
+		requestIntent(element.form, validate.serialize(element.name));
 	}
 
 	function reset(event: Event) {
@@ -584,8 +583,12 @@ export function createForm<Type extends Record<string, unknown> = any>(
 		}
 
 		if (result.status === 'error') {
-			// Update focus
-			focusFirstInvalidField(formElement);
+			for (const element of formElement.elements) {
+				if (isFieldElement(element) && error[element.name]) {
+					element.focus();
+					break;
+				}
+			}
 		}
 	}
 

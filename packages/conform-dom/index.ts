@@ -1,11 +1,10 @@
 export {
-	type KeysOf,
-	type KeyType,
+	type UnionKeyof,
+	type UnionKeyType,
 	type Constraint,
 	type FormMetadata,
 	type FormState,
 	type FieldName,
-	type Primitive,
 	type DefaultValue,
 	type FormContext,
 	type Form,
@@ -19,17 +18,10 @@ export {
 	type SubmissionResult,
 	type ListIntentPayload,
 	INTENT,
+	STATE,
 	list,
 	validate,
 	requestIntent,
 	parse,
 } from './submission.js';
-export {
-	getPaths,
-	formatPaths,
-	setValue,
-	flatten,
-	isPlainObject,
-	isMatchingPaths,
-	cleanup,
-} from './formdata.js';
+export { getPaths, formatPaths, isSubpath } from './formdata.js';

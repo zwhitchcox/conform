@@ -1,35 +1,35 @@
 import { type DefaultValue } from './form';
-import { createSubmitter, requestSubmit } from './dom';
-import { cleanup, flatten, isPlainObject, setValue } from './formdata';
+import { requestSubmit } from './dom';
+import { simplify, flatten, isPlainObject, setValue } from './formdata';
 import { invariant } from './util';
 
-export type State = {
+export type SubmissionState = {
 	key: Record<string, string>;
 	validated: Record<string, boolean>;
 };
 
 export interface SubmissionContext<Value> {
-	type: 'update' | 'submit';
+	intent: string | null;
 	initialValue: Record<string, unknown>;
 	value: Value | null;
 	error: Record<string, string[]>;
-	state: State;
+	state: SubmissionState;
 }
 
 export type Submission<Output> =
-	| {
-			type: 'update';
-			payload: Record<string, unknown>;
-			value: null;
-			error: Record<string, string[]> | null;
-			reject(options?: RejectOptions): SubmissionResult;
-			accept(options?: AcceptOptions): SubmissionResult;
-	  }
 	| {
 			type: 'submit';
 			payload: Record<string, unknown>;
 			value: Output | null;
 			error: Record<string, string[]>;
+			reject(options?: RejectOptions): SubmissionResult;
+			accept(options?: AcceptOptions): SubmissionResult;
+	  }
+	| {
+			type: 'update';
+			payload: Record<string, unknown>;
+			value: null;
+			error: Record<string, string[]> | null;
 			reject(options?: RejectOptions): SubmissionResult;
 			accept(options?: AcceptOptions): SubmissionResult;
 	  };
@@ -38,12 +38,12 @@ export type SubmissionResult = {
 	status: 'updated' | 'error' | 'success';
 	initialValue?: Record<string, unknown>;
 	error?: Record<string, string[]>;
-	state?: SubmissionContext<unknown>['state'];
+	state?: SubmissionState;
 };
 
 export type ResolveResult = {
 	intent: string | null;
-	state: State;
+	state: SubmissionState;
 	data: Record<string, unknown>;
 	fields: string[];
 };
@@ -62,8 +62,18 @@ export type RejectOptions =
 			fieldErrors: Record<string, string[]>;
 	  };
 
+/**
+ * The name to be used when submitting an intent
+ */
+export const INTENT = '__intent__';
+
+/**
+ * The name to be used when submitting a state
+ */
+export const STATE = '__state__';
+
 export function resolve(payload: FormData | URLSearchParams): ResolveResult {
-	const state = payload.get('__state__');
+	const state = payload.get(STATE);
 	const intent = payload.get(INTENT);
 	const data: Record<string, unknown> = {};
 	const fields: string[] = [];
@@ -75,7 +85,7 @@ export function resolve(payload: FormData | URLSearchParams): ResolveResult {
 	);
 
 	for (const [name, next] of payload.entries()) {
-		if (name === INTENT || name === '__state__') {
+		if (name === INTENT || name === STATE) {
 			continue;
 		}
 
@@ -180,7 +190,7 @@ export function parse<Value>(
 		});
 
 		return createSubmission({
-			type: form.intent !== null ? 'update' : 'submit',
+			intent: form.intent,
 			initialValue,
 			value: resolved.value ?? null,
 			error,
@@ -198,7 +208,7 @@ export function parse<Value>(
 export function createSubmission<Value>(
 	context: SubmissionContext<Value>,
 ): Submission<Value> {
-	if (context.type === 'update') {
+	if (context.intent !== null) {
 		return {
 			type: 'update',
 			payload: context.initialValue,
@@ -214,7 +224,7 @@ export function createSubmission<Value>(
 	}
 
 	return {
-		type: context.type,
+		type: 'submit',
 		payload: context.initialValue,
 		value: context.value,
 		error: context.error,
@@ -237,8 +247,8 @@ export function acceptSubmission(
 
 	return {
 		status: 'success',
-		initialValue: cleanup(context.initialValue) ?? {},
-		error: cleanup(context.error) as Record<string, string[]>,
+		initialValue: simplify(context.initialValue) ?? {},
+		error: simplify(context.error) as Record<string, string[]>,
 		state: context.state,
 	};
 }
@@ -261,9 +271,9 @@ export function rejectSubmission(
 	);
 
 	return {
-		status: context.type === 'update' ? 'updated' : 'error',
-		initialValue: cleanup(context.initialValue) ?? {},
-		error: cleanup(error) as Record<string, string[]>,
+		status: context.intent === null ? 'error' : 'updated',
+		initialValue: simplify(context.initialValue) ?? {},
+		error: simplify(error) as Record<string, string[]>,
 		state: context.state,
 	};
 }
@@ -277,8 +287,6 @@ export type Intent<Payload = unknown> = {
 		payload: Payload,
 	): (result: Omit<Required<SubmissionResult>, 'status'>) => void;
 };
-
-export const INTENT = '__intent__';
 
 export function createIntent(options: {
 	type: string;
@@ -350,11 +358,6 @@ export function createIntent<Payload, Context>(options: {
 	};
 }
 
-/**
- * Returns the properties required to configure an intent button for validation
- *
- * @see https://conform.guide/api/react#validate
- */
 export const validate = createIntent({
 	type: 'validate',
 	update(result, payload) {
@@ -362,7 +365,7 @@ export const validate = createIntent({
 	},
 });
 
-export const list = createIntent<ListIntentPayload, {}>({
+export const list = createIntent<ListIntentPayload, void>({
 	type: 'list',
 	serialize(payload) {
 		return JSON.stringify(payload);
@@ -380,8 +383,6 @@ export const list = createIntent<ListIntentPayload, {}>({
 		});
 
 		updateList(list, payload);
-
-		return {};
 	},
 	update(result, payload) {
 		switch (payload.operation) {
@@ -421,23 +422,14 @@ export type ListIntentPayload<Schema = unknown> =
 
 export function requestIntent(
 	form: HTMLFormElement | null | undefined,
-	buttonProps: {
-		value: string;
-		formNoValidate?: boolean;
-	},
+	value: string,
 ): void {
-	if (!form) {
-		// eslint-disable-next-line no-console
-		console.warn('No form element is provided');
-		return;
-	}
+	const submitter = document.createElement('button');
 
-	const submitter = createSubmitter({
-		name: INTENT,
-		value: buttonProps.value,
-		hidden: true,
-		formNoValidate: buttonProps.formNoValidate,
-	});
+	submitter.name = INTENT;
+	submitter.value = value;
+	submitter.hidden = true;
+	submitter.formNoValidate = true;
 
 	requestSubmit(form, submitter);
 }

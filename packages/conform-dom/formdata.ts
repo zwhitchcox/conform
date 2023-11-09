@@ -1,6 +1,7 @@
 /**
- * A ponyfill-like helper to get the form data with the submitter value.
- * It does not respect the tree order nor handles the image input.
+ * Construct a form data with the submitter value.
+ * It utilizes the submitter argument on the FormData constructor from modern browsers
+ * with fallback to append the submitter value in case it is not unsupported.
  *
  * @see https://developer.mozilla.org/en-US/docs/Web/API/FormData/FormData#parameters
  */
@@ -13,6 +14,7 @@ export function getFormData(
 	if (submitter && submitter.type === 'submit' && submitter.name !== '') {
 		const entries = payload.getAll(submitter.name);
 
+		// This assumes the submitter value to be always unique, which should be fine in most cases
 		if (!entries.includes(submitter.value)) {
 			payload.append(submitter.name, submitter.value);
 		}
@@ -70,7 +72,10 @@ export function formatPaths(paths: Array<string | number>): string {
 	}, '');
 }
 
-export function isMatchingPaths(name: string, parent: string) {
+/**
+ * Check if a name is a subpath of a parent name
+ */
+export function isSubpath(name: string, parent: string) {
 	const paths = getPaths(name);
 	const parentPaths = getPaths(parent);
 
@@ -111,6 +116,9 @@ export function setValue<Value>(
 	return pointer;
 }
 
+/**
+ * Check if a value is a plain object
+ */
 export function isPlainObject(
 	obj: unknown,
 ): obj is Record<string | number | symbol, unknown> {
@@ -121,20 +129,23 @@ export function isPlainObject(
 	);
 }
 
-export function cleanup<Type extends Record<string, unknown>>(
+/**
+ * Simplify value by removing empty object or array and null values
+ */
+export function simplify<Type extends Record<string, unknown>>(
 	value: Type,
 ): Record<string, unknown> | undefined;
-export function cleanup<Type extends Array<unknown>>(
+export function simplify<Type extends Array<unknown>>(
 	value: Type,
 ): Array<unknown> | undefined;
-export function cleanup(value: unknown): unknown | undefined;
-export function cleanup<Type extends Record<string, unknown> | Array<unknown>>(
+export function simplify(value: unknown): unknown | undefined;
+export function simplify<Type extends Record<string, unknown> | Array<unknown>>(
 	value: Type,
 ): Record<string, unknown> | Array<unknown> | undefined {
 	if (isPlainObject(value)) {
 		const obj = Object.entries(value).reduce<Record<string, unknown>>(
 			(result, [key, value]) => {
-				const data = cleanup(value);
+				const data = simplify(value);
 
 				if (typeof data !== 'undefined') {
 					result[key] = data;
@@ -157,7 +168,7 @@ export function cleanup<Type extends Record<string, unknown> | Array<unknown>>(
 			return undefined;
 		}
 
-		return value.map(cleanup);
+		return value.map(simplify);
 	}
 
 	if (value instanceof File || value === null) {
@@ -167,6 +178,9 @@ export function cleanup<Type extends Record<string, unknown> | Array<unknown>>(
 	return value;
 }
 
+/**
+ * Flatten a tree into a dictionary
+ */
 export function flatten(
 	data: Record<string | number | symbol, unknown> | Array<unknown> | undefined,
 	options?: {
@@ -175,12 +189,12 @@ export function flatten(
 	},
 ): Record<string, unknown> {
 	const result: Record<string, unknown> = {};
-	const resolve = options?.resolve ?? cleanup;
+	const resolve = options?.resolve ?? ((data) => data);
 
 	function setResult(data: unknown, name: string) {
-		const value = resolve(data);
+		const value = simplify(resolve(data));
 
-		if (value !== null) {
+		if (typeof value !== 'undefined') {
 			result[name] = value;
 		}
 	}

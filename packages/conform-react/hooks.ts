@@ -1,6 +1,6 @@
 import {
-	type KeysOf,
-	type KeyType,
+	type UnionKeyof,
+	type UnionKeyType,
 	type Constraint,
 	type FieldElement,
 	type FieldName,
@@ -13,7 +13,7 @@ import {
 	createForm,
 	isFieldElement,
 	getPaths,
-	isMatchingPaths,
+	isSubpath,
 	formatPaths,
 } from '@conform-to/dom';
 import {
@@ -66,10 +66,8 @@ export interface FormConfig<Type extends Record<string, any>>
 export type FieldsetConfig<Type> = Type extends Array<any>
 	? { [Key in keyof Type]: FieldConfig<Type[Key]> }
 	: Type extends { [key in string]?: any }
-	? { [Key in KeysOf<Type>]: FieldConfig<KeyType<Type, Key>> }
+	? { [Key in UnionKeyof<Type>]: FieldConfig<UnionKeyType<Type, Key>> }
 	: never;
-
-export type FieldListConfig<Item> = Array<FieldConfig<Item>>;
 
 export interface FieldConfig<Type> extends BaseConfig<Type> {
 	key?: string;
@@ -232,7 +230,7 @@ export function getFieldConfig<Type>(
 				}
 
 				for (const key of Object.keys(context.error)) {
-					if (isMatchingPaths(key, name) && !context.state.valid[key]) {
+					if (isSubpath(key, name) && !context.state.valid[key]) {
 						return false;
 					}
 				}
@@ -247,7 +245,7 @@ export function getFieldConfig<Type>(
 				const result: Record<string, string[]> = {};
 
 				for (const [key, errors] of Object.entries(context.error)) {
-					if (isMatchingPaths(key, name)) {
+					if (isSubpath(key, name)) {
 						result[key] = errors;
 					}
 				}
@@ -447,7 +445,7 @@ export interface FieldListOptions<Item> extends Omit<Options<Item[]>, 'name'> {
 
 export function useFieldList<Item>(
 	options: FieldListOptions<Item>,
-): FieldListConfig<Item> {
+): Array<FieldConfig<Item>> {
 	const subjectRef = useSubjectRef({
 		defaultValue: {
 			name: [options.name],

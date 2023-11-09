@@ -1,10 +1,23 @@
+import { invariant } from './util.js';
+
+/**
+ * Element that user can interact with,
+ * includes `<input>`, `<select>` and `<textarea>`.
+ */
 export type FieldElement =
 	| HTMLInputElement
 	| HTMLSelectElement
 	| HTMLTextAreaElement;
 
+/**
+ * HTML Element that can be used as a form control,
+ * includes `<input>`, `<select>`, `<textarea>` and `<button>`.
+ */
 export type FormControl = FieldElement | HTMLButtonElement;
 
+/**
+ * Form Control element. It can either be a submit button or a submit input.
+ */
 export type Submitter = HTMLInputElement | HTMLButtonElement;
 
 /**
@@ -34,7 +47,8 @@ export function isFieldElement(element: unknown): element is FieldElement {
 }
 
 /**
- * Resolves the form action based on the submit event
+ * Resolves the action from the submit event
+ * with respect to the submitter `formaction` attribute.
  */
 export function getFormAction(event: SubmitEvent): string {
 	const form = event.target as HTMLFormElement;
@@ -48,7 +62,8 @@ export function getFormAction(event: SubmitEvent): string {
 }
 
 /**
- * Resolves the form encoding type based on the submit event
+ * Resolves the encoding type from the submit event
+ * with respect to the submitter `formenctype` attribute.
  */
 export function getFormEncType(
 	event: SubmitEvent,
@@ -65,74 +80,42 @@ export function getFormEncType(
 }
 
 /**
- * Resolves the form method based on the submit event
+ * Resolves the method from the submit event
+ * with respect to the submitter `formmethod` attribute.
  */
 export function getFormMethod(
 	event: SubmitEvent,
-): 'get' | 'post' | 'put' | 'patch' | 'delete' {
+): 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' {
 	const form = event.target as HTMLFormElement;
 	const submitter = event.submitter as Submitter | null;
-	const method =
-		submitter?.getAttribute('formmethod') ?? form.getAttribute('method');
+	const method = (
+		submitter?.getAttribute('formmethod') ?? form.getAttribute('method')
+	)?.toUpperCase();
 
 	switch (method) {
-		case 'post':
-		case 'put':
-		case 'patch':
-		case 'delete':
+		case 'POST':
+		case 'PUT':
+		case 'PATCH':
+		case 'DELETE':
 			return method;
 	}
 
-	return 'get';
+	return 'GET';
 }
 
 /**
- * A function to create a submitter button element
- */
-export function createSubmitter(config: {
-	name: string;
-	value: string;
-	hidden?: boolean;
-	formAction?: string;
-	formEnctype?: ReturnType<typeof getFormEncType>;
-	formMethod?: ReturnType<typeof getFormMethod>;
-	formNoValidate?: boolean;
-}): Submitter {
-	const button = document.createElement('button');
-
-	button.name = config.name;
-	button.value = config.value;
-
-	if (config.hidden) {
-		button.hidden = true;
-	}
-
-	if (config.formAction) {
-		button.formAction = config.formAction;
-	}
-
-	if (config.formEnctype) {
-		button.formEnctype = config.formEnctype;
-	}
-
-	if (config.formMethod) {
-		button.formMethod = config.formMethod;
-	}
-
-	if (config.formNoValidate) {
-		button.formNoValidate = true;
-	}
-
-	return button;
-}
-
-/**
- * Trigger form submission with a submitter.
+ * Trigger a form submit event with an optional submitter.
+ * If the submitter is not mounted, it will be appended to the form and removed after submission.
  */
 export function requestSubmit(
-	form: HTMLFormElement,
+	form: HTMLFormElement | null | undefined,
 	submitter: Submitter | null,
 ): void {
+	invariant(
+		!!form,
+		'Failed to submit the form. The element provided is null or undefined.',
+	);
+
 	let shouldRemoveSubmitter = false;
 
 	if (submitter && !submitter.isConnected) {
@@ -154,17 +137,5 @@ export function requestSubmit(
 
 	if (submitter && shouldRemoveSubmitter) {
 		form.removeChild(submitter);
-	}
-}
-
-/**
- * Focus on the first invalid form control in the form
- */
-export function focusFirstInvalidField(form: HTMLFormElement) {
-	for (const element of form.elements) {
-		if (isFieldElement(element) && !element.validity.valid) {
-			element.focus();
-			break;
-		}
 	}
 }

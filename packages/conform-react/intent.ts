@@ -22,7 +22,7 @@ function createIntentButtonProps(value: string, form?: string) {
 	};
 }
 
-export function validate<Schema>(field: Field<Schema>) {
+export function validate(field: Field<unknown>) {
 	return createIntentButtonProps(
 		validateIntent.serialize(field.name),
 		field.formId,
