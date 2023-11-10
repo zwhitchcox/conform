@@ -1,11 +1,11 @@
 import { ConformBoundary, conform, useForm } from '@conform-to/react';
 import { parse as parseWithZod } from '@conform-to/zod';
-// import { parse as parseWithYup } from '@conform-to/yup';
+import { parse as parseWithYup } from '@conform-to/yup';
 import { type LoaderArgs, type ActionArgs, json } from '@remix-run/node';
 import { Form, useActionData, useLoaderData } from '@remix-run/react';
 import { Playground, Field } from '~/components';
 import { z } from 'zod';
-// import * as yup from 'yup';
+import * as yup from 'yup';
 
 interface Schema {
 	username: string;
@@ -13,35 +13,35 @@ interface Schema {
 
 function parseForm(formData: FormData, validator: string | null) {
 	switch (validator) {
-		// case 'yup': {
-		// 	return parseWithYup(formData, {
-		// 		schema: yup.object({
-		// 			username: yup
-		// 				.string()
-		// 				.required('Username is required')
-		// 				.test(
-		// 					'test-minlength',
-		// 					'Min. 5 characters',
-		// 					(username) => !username || username.length > 5,
-		// 				)
-		// 				.test(
-		// 					'test-lowercase',
-		// 					'At least 1 lowercase character',
-		// 					(username) => !username || username.toUpperCase() !== username,
-		// 				)
-		// 				.test(
-		// 					'test-uppercase',
-		// 					'At least 1 uppercase character',
-		// 					(username) => !username || username.toLowerCase() !== username,
-		// 				)
-		// 				.test(
-		// 					'test-number',
-		// 					'At least 1 number',
-		// 					(username) => !username || username.match(/[0-9]/) !== null,
-		// 				),
-		// 		}),
-		// 	});
-		// }
+		case 'yup': {
+			return parseWithYup(formData, {
+				schema: yup.object({
+					username: yup
+						.string()
+						.required('Username is required')
+						.test(
+							'test-minlength',
+							'Min. 5 characters',
+							(username) => !username || username.length > 5,
+						)
+						.test(
+							'test-lowercase',
+							'At least 1 lowercase character',
+							(username) => !username || username.toUpperCase() !== username,
+						)
+						.test(
+							'test-uppercase',
+							'At least 1 uppercase character',
+							(username) => !username || username.toLowerCase() !== username,
+						)
+						.test(
+							'test-number',
+							'At least 1 number',
+							(username) => !username || username.match(/[0-9]/) !== null,
+						),
+				}),
+			});
+		}
 		case 'zod': {
 			return parseWithZod(formData, {
 				schema: z.object({

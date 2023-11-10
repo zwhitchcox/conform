@@ -70,7 +70,7 @@ export default function rollup() {
 
 		// Schema resolver
 		...configurePackage('conform-zod'),
-		// ...configurePackage('conform-yup'),
+		...configurePackage('conform-yup'),
 
 		// View adapter
 		...configurePackage('conform-react'),

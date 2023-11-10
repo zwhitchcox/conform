@@ -47,7 +47,7 @@ export function parse<Schema extends ZodTypeAny>(
 export function parse<Schema extends ZodTypeAny>(
 	payload: FormData | URLSearchParams,
 	options: {
-		schema: Schema | ((intent: string | null) => Schema);
+		schema: Schema | ((intent: string) => Schema);
 		async?: boolean;
 		errorMap?: ZodErrorMap;
 	},

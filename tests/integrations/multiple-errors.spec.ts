@@ -91,7 +91,7 @@ test.describe('Zod', () => {
 	});
 });
 
-test.describe.skip('Yup', () => {
+test.describe('Yup', () => {
 	test('Client Validation', async ({ page }) => {
 		await page.goto('/multiple-errors?validator=yup');
 		await runValidationScenario(page);
