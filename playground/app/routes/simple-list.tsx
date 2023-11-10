@@ -73,8 +73,7 @@ export default function SimpleList() {
 								<div className="flex flex-row gap-2">
 									<button
 										className="rounded-md border p-2 hover:border-black"
-										{...intent.list(form.fields.items, {
-											operation: 'remove',
+										{...intent.list.remove(form.fields.items, {
 											index,
 										})}
 									>
@@ -82,8 +81,7 @@ export default function SimpleList() {
 									</button>
 									<button
 										className="rounded-md border p-2 hover:border-black"
-										{...intent.list(form.fields.items, {
-											operation: 'reorder',
+										{...intent.list.reorder(form.fields.items, {
 											from: index,
 											to: 0,
 										})}
@@ -92,8 +90,7 @@ export default function SimpleList() {
 									</button>
 									<button
 										className="rounded-md border p-2 hover:border-black"
-										{...intent.list(form.fields.items, {
-											operation: 'replace',
+										{...intent.list.replace(form.fields.items, {
 											index,
 											defaultValue: '',
 										})}
@@ -107,8 +104,7 @@ export default function SimpleList() {
 					<div className="flex flex-row gap-2">
 						<button
 							className="rounded-md border p-2 hover:border-black"
-							{...intent.list(form.fields.items, {
-								operation: 'prepend',
+							{...intent.list.prepend(form.fields.items, {
 								defaultValue: '',
 							})}
 						>
@@ -116,8 +112,7 @@ export default function SimpleList() {
 						</button>
 						<button
 							className="rounded-md border p-2 hover:border-black"
-							{...intent.list(form.fields.items, {
-								operation: 'append',
+							{...intent.list.append(form.fields.items, {
 								defaultValue: '',
 							})}
 						>

@@ -9,6 +9,7 @@ export {
 	type FormContext,
 	type Form,
 	type SubscriptionSubject,
+	type SubscriptionScope,
 	createForm,
 } from './form.js';
 export { type FieldElement, isFieldElement } from './dom.js';

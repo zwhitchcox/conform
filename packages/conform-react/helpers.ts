@@ -1,5 +1,6 @@
-import type { FormConfig, FieldConfig, BaseConfig } from './hooks.js';
 import type { CSSProperties, HTMLInputTypeAttribute } from 'react';
+import type { FieldConfig, BaseConfig } from './context.js';
+import type { FormConfig } from './hooks.js';
 
 interface FormControlProps {
 	id: string;
@@ -15,7 +16,7 @@ interface FormControlProps {
 }
 
 interface InputProps extends FormControlProps {
-	type?: HTMLInputTypeAttribute;
+	type?: Exclude<HTMLInputTypeAttribute, 'submit' | 'reset' | 'button'>;
 	minLength?: number;
 	maxLength?: number;
 	min?: string | number;
