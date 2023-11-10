@@ -47,7 +47,7 @@ export type FormConfig<Type extends Record<string, any>> = Pretty<
 			? { [Key in keyof Type]: FieldConfig<Type[Key]> }
 			: Type extends { [key in string]?: any }
 			? { [Key in UnionKeyof<Type>]: FieldConfig<UnionKeyType<Type, Key>> }
-			: never;
+			: Record<string | number, FieldConfig<any>>;
 		onSubmit: (
 			event: React.FormEvent<HTMLFormElement>,
 		) => ReturnType<Form<Type>['submit']>;
@@ -226,7 +226,7 @@ export function useFieldset<Type>(options: {
 	? { [Key in keyof Type]: FieldConfig<Type[Key]> }
 	: Type extends { [key in string]?: any }
 	? { [Key in UnionKeyof<Type>]: FieldConfig<UnionKeyType<Type, Key>> }
-	: never {
+	: Record<string | number, FieldConfig<any>> {
 	const subjectRef = useSubjectRef();
 	const context = useFormContext(options.formId, options.context, subjectRef);
 
