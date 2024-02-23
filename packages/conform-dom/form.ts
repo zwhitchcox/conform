@@ -465,29 +465,52 @@ function createValidProxy<FormError>(
 	});
 }
 
+function isEqual(
+	left: unknown,
+	right: unknown,
+	isConsidered?: (name: string) => boolean,
+): boolean {
+	if (Object.is(left, right)) {
+		return true;
+	}
+
+	if (
+		typeof left !== 'object' ||
+		left === null ||
+		typeof right !== 'object' ||
+		right === null
+	) {
+		return false;
+	}
+
+	const leftKeys = Object.keys(left);
+	const rightKeys = Object.keys(right);
+
+	if (leftKeys.length !== rightKeys.length) {
+		return false;
+	}
+
+	for (const key of leftKeys) {
+		if (
+			(isConsidered?.(key) ?? true) &&
+			(!Object.hasOwnProperty.call(right, key) ||
+				// @ts-expect-error
+				!isEqual(left[key], right[key]))
+		) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 function createDirtyProxy(
 	defaultValue: Record<string, unknown>,
 	value: Record<string, unknown>,
 	shouldDirtyConsider: (name: string) => boolean,
 ): Record<string, boolean> {
 	return createStateProxy(
-		(name) =>
-			JSON.stringify(defaultValue[name]) !==
-			JSON.stringify(value[name], (key, value) => {
-				if (name === '' && key === '' && value) {
-					return Object.entries(value).reduce<
-						Record<string, unknown> | undefined
-					>((result, [name, value]) => {
-						if (!shouldDirtyConsider(name)) {
-							return result;
-						}
-
-						return Object.assign(result ?? {}, { [name]: value });
-					}, undefined);
-				}
-
-				return value;
-			}),
+		(name) => !isEqual(defaultValue[name], value[name], shouldDirtyConsider),
 	);
 }
 
