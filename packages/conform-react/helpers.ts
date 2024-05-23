@@ -368,7 +368,7 @@ export function getCollectionProps<
 			/**
 			 * The input type. Use `checkbox` for multiple selection or `radio` for single selection.
 			 */
-			type: 'checkbox' | 'radio';
+			type: Type;
 			/**
 			 * The `value` assigned to each input element.
 			 */
@@ -379,11 +379,12 @@ export function getCollectionProps<
 			value?: boolean;
 		}
 	>,
+	Type extends 'checkbox' | 'radio',
 >(
 	metadata: FieldMetadata<Schema, any, any>,
 	options: Options,
 ): Array<
-	InputProps & Pick<Options, 'type'> & Pick<Required<InputProps>, 'value'>
+	InputProps & { type: Type } & Pick<Required<InputProps>, 'value'>
 > {
 	return options.options.map((value) =>
 		simplify({
